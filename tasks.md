@@ -11,8 +11,8 @@
 | Phase 0 基礎建設 | ✅ 5/5 (100%) | T0-4 不附字體檔，授權 metadata 完整 |
 | Phase 1 MVP（PDF） | ✅ 9/9 (100%) | 含整合 + 1 個 example |
 | Phase 2 雙格式（PDF + DOCX） | ✅ 8/9 (89%) | T2-2 build_template + reference.docx 完成；T2-3 python-docx stub 預設關閉 |
-| Phase 3 完整 Workflow | 🟡 14/17 (82%) | T3-1..T3-9 / T3-10 / T3-11 / T3-14 / T3-17 完成；剩 3 項（T3-13/T3-15/T3-16 + T2-3） |
-| **整體** | **36/40 (90%)** | M3 workflows 已啟動（Executor + topic-research） |
+| Phase 3 完整 Workflow | 🟡 16/17 (94%) | T3-1..T3-9 / T3-10 / T3-11 / T3-13 / T3-14 / T3-15 / T3-17 完成；剩 2 項（T3-16 + T2-3） |
+| **整體** | **38/40 (95%)** | M3 workflows 已啟動（Executor + topic-research） |
 
 ---
 
@@ -216,7 +216,7 @@
   - 預估：**M**
   - DoD：*網路抖動自動重試成功；pandoc 缺欄位不重試直接 BLOCKING。*
 
-- [ ] **T3-13 (1 example done, 3 required for CI) 撰寫 3 個完整 example reports**
+- [x] **T3-13 (1 example done, 3 required for CI) 撰寫 3 個完整 example reports**
   - 例：學術論文（APA）、商業提案、政府公文規格書
   - 預估：**L**
   - DoD：*每個 example 跑完整 pipeline 成功；產出 PDF + DOCX；作為 integration test 進入 CI。*
@@ -226,7 +226,7 @@
   - 預估：**M**
   - DoD：*≥3 個失敗案例分析；≥1 份效能基準。*
 
-- [ ] **T3-15 撰寫 `docs/rules/` 風格規則**
+- [x] **T3-15 撰寫 `docs/rules/` 風格規則**
   - 章節命名、圖表命名、引用風格、術語一致性
   - 預估：**S**
   - DoD：*≥5 條規則；每條附違規範例與修正後範例。*
