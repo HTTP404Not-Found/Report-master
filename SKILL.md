@@ -170,6 +170,12 @@ python -m scripts.report_gen generate \
 
 **不做**：不會寫 HTML、不會調用 weasyprint、不會 review 內容品質。
 
+**詳細 workflow**：見 `references/strategist.md`（T3-1）。
+- 10 個問題的 BLOCKING / WARN 條件
+- 對話流程 Mermaid 圖
+- 5 種範本（academic / business / spec / gov / custom）對齊 `scripts/project_manager.py`
+- CLI helper：`python -m scripts.strategist --template <type> --output <path>`
+
 ### Executor（執行者）
 
 **何時啟動**：Stage 2。
