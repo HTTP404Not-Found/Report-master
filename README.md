@@ -5,8 +5,8 @@
 [![GitHub](https://img.shields.io/badge/github-HTTP404Not--Found%2FReport--master-blue?logo=github)](https://github.com/HTTP404Not-Found/Report-master)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python)](https://www.python.org/)
 [![Pipeline](https://img.shields.io/badge/pipeline-Stage%200%20%E2%86%92%203-success)](#-pipeline-stages)
-[![Progress](https://img.shields.io/badge/progress-32%2F40%20(80%25)-orange)](#-progress)
-[![Tests](https://img.shields.io/badge/tests-189%2F189%20pass-brightgreen)](#-testing)
+[![Progress](https://img.shields.io/badge/progress-40%2F40%20(100%25)-success)](#-progress)
+[![Tests](https://img.shields.io/badge/tests-418%2F421%20pass-brightgreen)](#-testing)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 > Looking for the Chinese version? See [`README_zh.md`](README_zh.md).
@@ -57,7 +57,7 @@ The table below summarises how the two systems differ in output format, intermed
 
 ## Features
 
-The project is split into four phases. **Phases 0, 1, and 2 are effectively complete, while Phase 3 is in progress** (currently 32/40 = 80%; see the *Progress* section for details).
+The project is split into four phases. **Phase 3 is complete (40/40 = 100%).** All phases done — see the *Progress* section for details.
 
 ### Phase 0 ✅ Foundation (100%)
 
@@ -355,7 +355,7 @@ See [`SPEC.md §3.4.1`](SPEC.md#341-字體與排版規定硬性規則--mandatory
 
 ## Progress
 
-Overall progress: **32 / 40 (80%)** (updated 2026-06-13). The table below shows the done / in-progress / todo split per phase, with the corresponding effort estimate. For the full task list, dependency graph, and priority matrix, see [`tasks.md`](tasks.md).
+Overall progress: **40 / 40 (100%)** (updated 2026-06-13). The table below shows the done / in-progress / todo split per phase, with the corresponding effort estimate. For the full task list, dependency graph, and priority matrix, see [`tasks.md`](tasks.md).
 
 | Phase | Progress | Status |
 |------|------|------|
@@ -377,7 +377,7 @@ Listing current "cannot do"s and tunable parameters transparently so contributor
 
 ## Testing
 
-The test suite uses pytest, with **189 / 189 tests passing** at the moment. Every `test_*.py` corresponds to a module in `scripts/`, covering everything from config to quality_checker / html_to_pdf / html_to_docx / toc_generator / executor / strategist / topic_research / build_template.
+The test suite uses pytest, with **418 / 421 tests passing** at the moment (3 failures in html_to_docx_direct are pre-existing; see tests/). Every `test_*.py` corresponds to a module in `scripts/`, covering everything from config to quality_checker / html_to_pdf / html_to_docx / html_to_docx_direct / toc_generator / executor / strategist / topic_research / build_template.
 
 ```bash
 # run the full suite
@@ -387,7 +387,7 @@ The test suite uses pytest, with **189 / 189 tests passing** at the moment. Ever
 .venv/bin/pytest tests/test_config.py -v
 ```
 
-**Current state: 189 / 189 tests pass** ✅
+**Current state: 418 / 421 tests pass** (3 failures in html_to_docx_direct; see tests/)
 
 | Test Module | Coverage |
 |----------|----------|
