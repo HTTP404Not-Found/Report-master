@@ -1,17 +1,18 @@
 ---
 name: topic-research
-description: Report-master no-source workflow. Starts from a bare topic (no PDF/DOCX/URL), runs LLM-driven preliminary research to produce sub-questions + outline, then feeds into Strategist + Executor. Use when the user has only a topic and no source materials.
-version: 1.0
+description: Report-master no-source workflow. Starts from a bare topic (no PDF/DOCX/URL), runs LLM-driven preliminary research to produce sub-questions + outline, then optionally runs Content Expansion via web_search to enrich individual sections with real-world data, and finally feeds into Strategist + Executor. Use when the user has only a topic and no source materials, or when sections need live web evidence.
+version: "1.1"
 ---
 
 # topic-research — Report-master 無源材料 workflow
 
-> **文件版本：v1.0** · 對應 SPEC.md v0.3 + SKILL.md v1.0 + `references/strategist.md` v1 + `references/executor-base.md` v1
+> **文件版本：v1.1** · 對應 SPEC.md v0.3 + SKILL.md v1.0 + `references/strategist.md` v1 + `references/executor-base.md` v1 + `workflows/strategist.md` v1.1 + `workflows/user-confirmation.md` v1 + `scripts/web_research.py` v1
 > **啟動時機**：Stage 0 之前／Stage 0 期間，當使用者**沒有**任何來源材料（PDF / DOCX / URL / Markdown / 手寫筆記）
 > **產出物**：
 >   1. `report_output/research_notes.md`（sub-questions + outline）
->   2. 對應的 `report_lock.md`（由 Strategist 10 Confirmations 收斂產生）
->   3. 對應的 `report_spec.md`（章節大綱）
+>   2. `report_output/content_expansion/{slug}.md` × N（**v1.1 新增**：Content Expansion 階段，每章節的搜尋 bullets）
+>   3. 對應的 `report_lock.md`（由 Strategist 10 Confirmations 收斂產生）
+>   4. 對應的 `report_spec.md`（章節大綱）
 > **輸入物**：使用者的一句話 topic（如：「生成式 AI 對教育的影響」）
 
 ---
@@ -83,14 +84,18 @@ flowchart TD
 
     P3[3️⃣ 寫入 research_notes.md<br/>含 sub-questions + outline] --> Gate
 
-    Gate{研究筆記品質檢查<br/>sub-questions ≥ 3<br/>sections ≥ 5?} -->|PASS| P4
+    Gate{研究筆記品質檢查<br/>sub-questions ≥ 3<br/>sections ≥ 5?} -->|PASS| P3b
     Gate -->|FAIL| P1
+
+    P3b[**3️⃣.5 Content Expansion 階段**<br/>（v1.1 新增，Problem 3 修）<br/>對每章節 sub-question<br/>呼叫 web_search 取得 bullets] --> P4
 
     P4[4️⃣ Strategist 10 Confirmations<br/>source.materials=none<br/>吃 research_notes] --> P5
 
-    P5[5️⃣ 產出 report_lock.md<br/>+ report_spec.md] --> P6
+    P5[5️⃣ 產出 report_lock.md<br/>+ report_spec.md<br/>+ 0_outline.md 藍圖] --> P5b
 
-    P6[6️⃣ Executor 逐節生成 HTML<br/>吃 research_notes + lock] --> P7
+    P5b[**5️⃣.5 User Confirmation**<br/>（v1.1 新增，Problem 2 修）<br/>產 0_outline_for_review.md<br/>+ 0_confirmed.json] --> P6
+
+    P6[6️⃣ Executor 逐節生成 HTML<br/>吃 research_notes + lock +<br/>content_expansion bullets] --> P7
 
     P7[7️⃣ Stage 3 平行轉檔<br/>html_to_pdf + html_to_docx] --> Done
 
@@ -100,8 +105,10 @@ flowchart TD
     style P1 fill:#ffd
     style P2 fill:#ffd
     style P3 fill:#dfd
+    style P3b fill:#ffd,stroke:#f80,stroke-width:2px
     style P4 fill:#ddf
     style P5 fill:#dfd
+    style P5b fill:#ffd,stroke:#f80,stroke-width:2px
     style P6 fill:#ddf
     style P7 fill:#dfd
     style Done fill:#dfd
@@ -225,6 +232,81 @@ flowchart TD
 - 寫入 `report_output/` 子目錄
 - 與 `report_lock.md` / `report_spec.md` 並列
 - 不可覆蓋：每次執行備份為 `research_notes_v{n}.md`（v1, v2, ...）
+
+### 4.3.5 Stage — Content Expansion（**v1.1 新增**，Problem 3 修）
+
+**設計動機**：舊版 topic-research 把 sub-questions 轉成 outline 後就交給 Executor 寫 HTML——問題是「LLM 寫出來的內容沒有真實世界的數據 / 引用」，整篇報告變成「聽起來有道理但沒有 evidence」的純 LLM 知識。新版在 outline 後、Strategist 前插入一個 **Content Expansion** 階段，用 `web_search` tool 對每個 sub-question 補上 3-5 個真實世界的 bullets。
+
+**目標**：對每個 sub-question（或對應的章節）呼叫 `web_search` 取得 3-5 個 source hits，整理成 3-5 個可直接餵給 Executor 的 bullets（包含資料來源 URL）。
+
+**做法**：
+
+1. 讀取 `report_output/research_notes.md` 取得 sub_questions
+2. 對每個 sub-question（除了緒論 / 結論這類骨架章節），呼叫 `scripts/web_research.py`：
+   ```bash
+   python -m scripts.web_research \
+     --query "{sub_question_text} 2025 數據 案例" \
+     --output report_output/
+   ```
+3. 每個 query 產出 `report_output/content_expansion/{slug}.md`：
+   - **Bullets**：3-5 個可直接引用的重點（含時間、數據、案例）
+   - **Sources**：對應的 URL 列表（audit trail）
+4. **可選觸發**：使用者可在 Stage 1 確認時決定哪些章節需要 Content Expansion（透過 blueprint 的「備註」欄標記）
+
+**Search 介面**（見 `scripts/web_research.py`）：
+- 預設 `StubWebSearch`：無網路 / 無 API 時的 fallback，回傳 canned response
+- 真實 `WebSearchToolBackend`：包裝 OpenClaw `web_search` tool 或自定 callable（注入測試 mock）
+
+**寫入格式**：
+
+```markdown
+# Content Expansion — {query}
+
+> 對應 workflows/topic-research.md v1.1（Problem 3 修）
+> 查詢：{query}
+> 產生時間：{timestamp}
+> Search backend：{stub / web_search_tool}
+
+## Bullets（給 Executor 直接引用）
+
+1. 「{topic}」自 2020 年起在多個領域快速發展，目前已是主流研究主題之一。
+2. 根據最新統計，「{topic}」相關的政策文件已超過 N 份，覆蓋至少 M 個國家/地區。
+3. 實證研究顯示，「{topic}」對學習成效有正向影響（中等證據強度）。
+4. 國際比較發現，「{topic}」在 D 區域最為普及，E 區域正在追趕。
+5. 專家建議：「{topic}」的下一階段研究應聚焦於長期效果、倫理風險與政策落地。
+
+## Sources
+
+1. [標題 1](https://...) — snippet
+2. [標題 2](https://...) — snippet
+...
+
+## 給 Executor 的提示
+
+- 上述 bullets 可直接融入對應段落（先寫 bullets，再擴寫成完整段落）
+- 每個 bullet 至少要附 1 個 source citation（依 citation_style）
+- 若 bullets 不足以撐起章節，請回到本 stage 再跑 1 次（不同 query）
+```
+
+**BLOCKING 條件**：
+- bullets < 3 → BLOCKING（內容拓展不足）
+- query 空字串 → BLOCKING
+
+**與舊版的差異**：
+- 舊版：「Executor 寫 HTML 時 LLM 自己上網搜（或不搜）」→ 結果不可控
+- 新版：「stage 4.3.5 預先搜好，bullets 寫死到 content_expansion/」→ Executor 必須用 → 結果可控 + 可重現
+
+**使用方式**：
+
+```bash
+# 對單一 sub-question 跑 Content Expansion
+python -m scripts.web_research --query "生成式 AI 在 K-12 教育應用 2025" --output ./report_output/
+
+# 對所有 sub-questions 批次跑（loop script 由 main agent 處理）
+for sq in $(jq -r '.sub_questions[].question' research_notes.md); do
+  python -m scripts.web_research --query "$sq 2025" --output ./report_output/
+done
+```
 
 ---
 
@@ -462,7 +544,10 @@ exports/
 | `SKILL.md` | 主 workflow authority；本檔於「無源材料」情境下被引用 |
 | `references/strategist.md` (T3-1) | 下游：吃 research_notes 收斂出 lock |
 | `references/executor-base.md` (T3-2) | 下游：吃 lock + research_notes 逐節生成 |
+| `workflows/strategist.md` v1.1 | 下游：吃 research_notes + content_expansion 產 Section Blueprint + confirmation |
+| `workflows/user-confirmation.md` v1 | 下游：Stage 1 → Stage 2 的確認 gate |
 | `scripts/topic_research.py` | CLI 對應本 workflow；只跑 Research + Outline |
+| **`scripts/web_research.py` v1** | **新增**：Content Expansion 階段 CLI；對每個 sub-question 跑 `web_search` 產 bullets |
 | `scripts/strategist.py` | 對應 references/strategist.md；吃 research_notes 產 lock |
 | `scripts/executor.py` (T3-2) | 對應 references/executor-base.md；逐節生成 |
 | `docs/report_lock_schema.md` | lock schema；Strategist 必須遵守 |
@@ -488,8 +573,9 @@ exports/
 
 | 版本 | 狀態 | 說明 |
 |------|------|------|
-| v1.0 | **current** | T3-3 完成；5 階段流程（Research → Outline → Strategist → Executor → Stage 3）+ Mermaid 圖 + CLI helper + 端到端範例 |
+| v1.0 | previous | T3-3 完成；5 階段流程（Research → Outline → Strategist → Executor → Stage 3）+ Mermaid 圖 + CLI helper + 端到端範例 |
+| v1.1 | **current** | **新增 Content Expansion 階段**（Problem 3 修）；插入在 Outline 後、Strategist 前；用 `scripts/web_research.py` + `web_search` tool 對每個 sub-question 產 3-5 個 bullets + sources |
 
 ---
 
-*workflows/topic-research.md v1.0 — 對應 SPEC.md v0.3 + SKILL.md v1.0 + references/strategist.md v1 + references/executor-base.md v1, 2026-06-13*
+*workflows/topic-research.md v1.1 — 對應 SPEC.md v0.3 + SKILL.md v1.0 + references/strategist.md v1 + references/executor-base.md v1 + workflows/strategist.md v1.1 + workflows/user-confirmation.md v1 + scripts/web_research.py v1, 2026-06-13*

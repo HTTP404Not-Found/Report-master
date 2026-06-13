@@ -319,10 +319,105 @@ def _get_inline_text(node) -> str:
     return node.get_text()
 
 
+def _sanitize_markdown_emphasis(html: str) -> str:
+    """Convert stray Markdown bold/italic syntax to HTML tags.
+
+    Why: upstream producers (e.g. LLM-generated section HTML) sometimes
+    emit literal ``**text**`` instead of ``<strong>text</strong>``. If we
+    pass that string straight to python-docx, the asterisks survive as
+    literal characters and Word displays ``**粗體**`` instead of bold text.
+
+    This sanitizer runs on the raw HTML string before BeautifulSoup parses
+    it, so downstream ``handle_strong``/``handle_b`` always see clean tags.
+
+    Rules (conservative — only operates on text NOT already inside an HTML
+    tag, to avoid corrupting attribute values):
+
+    - ``**text**``     → ``<strong>text</strong>``   (Markdown bold)
+    - ``__text__``     → ``<strong>text</strong>``   (Markdown bold alt)
+    - ``*text*``       → ``<em>text</em>``           (Markdown italic)
+    - ``_text_``       → ``<em>text</em>``           (Markdown italic alt)
+
+    Non-greedy matching + minimum 1 char inside prevents matching empty
+    pairs. Whitespace-only content is left alone.
+    """
+    if not html or "**" not in html and "__" not in html and "*" not in html and "_" not in html:
+        return html
+    # Use a callback so we never match across HTML tag boundaries.
+    out_parts: List[str] = []
+    i = 0
+    n = len(html)
+    while i < n:
+        ch = html[i]
+        if ch == "<":
+            # Copy the entire tag verbatim until the matching '>'.
+            end = html.find(">", i)
+            if end == -1:
+                out_parts.append(html[i:])
+                break
+            out_parts.append(html[i : end + 1])
+            i = end + 1
+            continue
+        if ch == "*":
+            # Try **bold**
+            if i + 1 < n and html[i + 1] == "*":
+                end = html.find("**", i + 2)
+                if end != -1 and end > i + 2:
+                    inner = html[i + 2 : end]
+                    if inner.strip():
+                        out_parts.append(f"<strong>{inner}</strong>")
+                        i = end + 2
+                        continue
+            # Try *italic*
+            end = html.find("*", i + 1)
+            if end != -1 and end > i + 1:
+                inner = html[i + 1 : end]
+                if inner.strip() and "<" not in inner and ">" not in inner:
+                    out_parts.append(f"<em>{inner}</em>")
+                    i = end + 1
+                    continue
+            out_parts.append(ch)
+            i += 1
+            continue
+        if ch == "_":
+            # Try __bold__
+            if i + 1 < n and html[i + 1] == "_":
+                end = html.find("__", i + 2)
+                if end != -1 and end > i + 2:
+                    inner = html[i + 2 : end]
+                    if inner.strip():
+                        out_parts.append(f"<strong>{inner}</strong>")
+                        i = end + 2
+                        continue
+            # Try _italic_
+            end = html.find("_", i + 1)
+            if end != -1 and end > i + 1:
+                inner = html[i + 1 : end]
+                if inner.strip() and "<" not in inner and ">" not in inner:
+                    out_parts.append(f"<em>{inner}</em>")
+                    i = end + 1
+                    continue
+            out_parts.append(ch)
+            i += 1
+            continue
+        out_parts.append(ch)
+        i += 1
+    return "".join(out_parts)
+
+
 def _add_runs(paragraph, node, lock: Dict[str, Any], base_bold: bool = False) -> None:
     """Recursively add runs to a paragraph from an HTML node.
 
     Handles <strong>/<b>, <em>/<i>, <code>, <u>, <a>, <sup>, <sub>.
+
+    Bold handling contract (Problem 4 fix):
+        - When the node is ``<strong>`` or ``<b>``, every descendant run
+          is created with ``run.bold = True``.
+        - When the node already contains another ``<strong>``/``<b>``,
+          we OR the bold flag with the existing one (idempotent).
+        - When the input HTML still contains literal ``**`` markers
+          (escape failure upstream), ``_sanitize_markdown_emphasis()``
+          converts them to ``<strong>`` before we ever see the node.
     """
     from bs4 import NavigableString, Tag
     from docx.shared import RGBColor
@@ -343,8 +438,10 @@ def _add_runs(paragraph, node, lock: Dict[str, Any], base_bold: bool = False) ->
     children = list(node.children)
 
     if name in ("strong", "b"):
+        # Recurse with base_bold OR'd in, so nested <strong><strong>x
+        # </strong></strong> still produces one bold run (idempotent).
         for child in children:
-            _add_runs(paragraph, child, lock, base_bold=True)
+            _add_runs(paragraph, child, lock, base_bold=base_bold or True)
         return
     if name in ("em", "i"):
         for child in children:
@@ -801,6 +898,13 @@ def html_to_docx_direct(
             if not s_stripped:
                 raise HTMLToDOCXDirectError("HTML 字串為空")
             raw_html = s
+
+    # ─── Sanitize stray Markdown bold/italic syntax ───
+    # Upstream producers sometimes emit literal `**text**` instead of
+    # `<strong>text</strong>`. Convert those into proper tags before
+    # parsing, so handle_strong/handle_b see clean markup and apply
+    # `bold=True` instead of leaving the asterisks as literal chars.
+    raw_html = _sanitize_markdown_emphasis(raw_html)
 
     # Parse (silence the spurious 'looks like a filename' warning that
     # lxml emits when the HTML doesn't begin with a recognized doctype/tag).

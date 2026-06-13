@@ -1,14 +1,14 @@
 ---
 name: strategist
-description: Report-master Stage 1 Strategist role + 10 Confirmations dialogue. Converges user intent into report_lock.md (17 required fields) + report_spec.md (chapter outline). Refuses to emit lock if any required field missing (BLOCKING).
-version: 1.0
+description: Report-master Stage 1 Strategist role + 10 Confirmations dialogue. Converges user intent into report_lock.md (17 required fields) + report_spec.md (chapter outline). Refuses to emit lock if any required field missing (BLOCKING). See workflows/strategist.md v1.1 for the user-facing workflow with Section Blueprint (Problem 1) + User Confirmation Loop (Problem 2).
+version: "1.0"
 ---
 
 # Strategist — Report-master Stage 1 規劃者
 
-> **文件版本：v1.0** · 對應 SPEC.md v0.3 + SKILL.md v1.0 + docs/report_lock_schema.md v1
+> **文件版本：v1.0** · 對應 SPEC.md v0.3 + SKILL.md v1.0 + docs/report_lock_schema.md v1 + **workflows/strategist.md v1.1**（user-facing workflow with Section Blueprint + Confirmation Loop）
 > **啟動時機**：Stage 1（在 Stage 0 source probe 完成後、在 Stage 2 Executor 開工前）
-> **產出物**：`report_lock.md`（機器可讀）+ `report_spec.md`（人類可讀）
+> **產出物**：`report_lock.md`（機器可讀）+ `report_spec.md`（人類可讀）+ `report_output/0_outline.md`（Section Blueprint, **v1.1 新增**）+ `report_output/0_outline_for_review.md` + `report_output/0_confirmed.json`（**v1.1 新增**）
 > **輸入物**：Stage 0 收斂後的 `normalized.md`、使用者口頭 / 文字需求
 
 ---
@@ -501,6 +501,8 @@ python -m scripts.strategist --validate path/to/report_lock.md
 | `scripts/project_manager.py` | `init_project()` 初始化專案目錄樹；呼叫 `generate_lock_template()` |
 | `references/executor-base.md` (T3-2) | Stage 2 Executor 規則；吃本檔產出的 lock |
 | `scripts/report_gen.py` | Stage 2 + 3 主 entry；讀 lock 啟動 |
+| **`workflows/strategist.md` v1.1** | **新增**；user-facing workflow（Section Blueprint + Confirmation Loop） |
+| **`workflows/user-confirmation.md` v1** | **新增**；Confirmation Loop 細節（Problem 2） |
 
 ---
 
@@ -522,7 +524,8 @@ python -m scripts.strategist --validate path/to/report_lock.md
 | 版本 | 狀態 | 說明 |
 |------|------|------|
 | v1.0 | **current** | T3-1 完成；10 Confirmations 對話 + Mermaid 流程圖 + 5 種範本 CLI |
+| （workflows/strategist.md v1.1） | user-facing | **新增 Section Blueprint**（Problem 1）+ **Confirmation Loop**（Problem 2） |
 
 ---
 
-*references/strategist.md v1.0 — 對應 SPEC.md v0.3 + SKILL.md v1.0 + docs/report_lock_schema.md v1, 2026-06-13*
+*references/strategist.md v1.0 — 對應 SPEC.md v0.3 + SKILL.md v1.0 + docs/report_lock_schema.md v1 + workflows/strategist.md v1.1, 2026-06-13*
