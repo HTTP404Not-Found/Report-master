@@ -1,0 +1,110 @@
+name: CI
+
+# T3-16: Report-master CI workflow
+# 對應 tasks.md T3-16 (L 等級)
+#
+# 觸發：
+#   - push 到 main
+#   - pull_request 到 main
+#
+# 流程：
+#   1. checkout + setup Python 3.11
+#   2. 建立 / 安裝 .venv（含 scripts/requirements.txt）
+#   3. step 1: 全專案 pytest（tests/）
+#   4. step 2: end-to-end smoke（tests/test_examples.py）
+#   5. step 3: CLI smoke（python -m scripts.source_to_md.url_to_md --help）
+#   6. step 4: flake8 scripts/ lint
+#   7. step 5: 確認 examples/output_1/ + examples/output_2/ 的 report_final.html
+#      都存在且 > 1KB
+#
+# DoD：兩個 example smoke 都 pass 才算 green；任一失敗 → exit 1 + 紅燈。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 同 PR / 同 push 不要排隊；最新 run 自動取消舊的。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint + Tests + Smoke
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Create / reuse .venv and install dependencies
+        shell: bash
+        run: |
+          if [ ! -d ".venv" ]; then
+            python -m venv .venv
+          fi
+          . .venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r scripts/requirements.txt
+          pip install flake8 pytest
+
+      # ── step 1: 全專案測試（≥ 358 tests） ─────────────────────────
+      - name: Run full test suite
+        shell: bash
+        run: |
+          . .venv/bin/activate
+          pytest tests/ -q --tb=short
+
+      # ── step 2: end-to-end smoke（test_examples.py） ───────────────
+      - name: End-to-end smoke (test_examples.py)
+        shell: bash
+        run: |
+          . .venv/bin/activate
+          pytest tests/test_examples.py -q
+
+      # ── step 3: CLI smoke（source_to_md.url_to_md --help） ─────────
+      - name: CLI smoke (scripts.source_to_md.url_to_md)
+        shell: bash
+        run: |
+          . .venv/bin/activate
+          python -m scripts.source_to_md.url_to_md --help
+
+      # ── step 4: lint（flake8 scripts/） ─────────────────────────────
+      - name: Lint (flake8 scripts/)
+        shell: bash
+        run: |
+          . .venv/bin/activate
+          flake8 scripts/ --max-line-length=120 --ignore=E501,W503
+
+      # ── step 5: 兩個 example output 都存在且 > 1KB ─────────────────
+      - name: Verify example outputs exist and are non-trivial
+        shell: bash
+        run: |
+          set -e
+          . .venv/bin/activate
+
+          # 兩個 example 都必須在；缺一即 fail
+          for ex in examples/output_1 examples/output_2; do
+            html="$ex/report_final.html"
+            if [ ! -f "$html" ]; then
+              echo "::error file=$html::Missing report_final.html in $ex"
+              echo "Missing $html — please run scripts/test_examples.py smoke first."
+              exit 1
+            fi
+            size=$(stat -c%s "$html")
+            if [ "$size" -le 1024 ]; then
+              echo "::error file=$html::report_final.html is too small ($size bytes, need > 1024)"
+              exit 1
+            fi
+            echo "✓ $html = $size bytes"
+          done
+
+          echo "✓ All example outputs present and > 1KB"
