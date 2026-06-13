@@ -562,18 +562,32 @@ def _add_heading(doc, node, level: int) -> None:
 
 
 def _add_list(doc, node, ordered: bool, lock: Dict[str, Any]) -> None:
-    """Add a <ul> or <ol> with its <li> children."""
+    """Add a <ul> or <ol> with its <li> children.
+
+    Uses Word's real List Number / List Bullet style so Word treats them
+    as structured lists (auto-renumber on delete, proper list indentation).
+    Falls back to manual prefix + Normal style if the style doesn't exist.
+    """
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
 
+    # Determine which style to use
+    style_name = "List Number" if ordered else "List Bullet"
+    style_names = [s.name for s in doc.styles]
+    use_real_list = style_name in style_names
+
     items = [c for c in node.children
              if getattr(c, "name", None) == "li"]
+
     for idx, li in enumerate(items, start=1):
-        marker = f"{idx}." if ordered else "•"
-        p = doc.add_paragraph(style="Normal")
-        # Add tab + marker prefix
-        run = p.add_run(f"{marker}\t")
-        # Then inline content
+        if use_real_list:
+            p = doc.add_paragraph(style=style_name)
+        else:
+            # Fallback: manual prefix (old behaviour)
+            marker = f"{idx}." if ordered else "•"
+            p = doc.add_paragraph(style="Normal")
+            run = p.add_run(f"{marker}\t")
+        # Inline content
         _add_runs(p, li, lock)
         # Indent
         try:
@@ -618,6 +632,10 @@ def _add_table(doc, node, lock: Dict[str, Any]) -> None:
     table.style = "Table Grid"
     table.autofit = True
 
+    # Read lock table formatting
+    table_fmt = (lock.get("formatting") or {}).get("table") or {}
+    table_font_size = table_fmt.get("font_size", 12)
+
     for r_idx, cells in enumerate(rows):
         for c_idx, cell_html in enumerate(cells):
             if c_idx >= cols:
@@ -630,8 +648,11 @@ def _add_table(doc, node, lock: Dict[str, Any]) -> None:
             # Bold if <th>
             is_header = (cell_html.name == "th")
             _add_runs(p, cell_html, lock, base_bold=is_header)
+            # Apply table font size to all runs in this cell
+            for run in p.runs:
+                run.font.size = Pt(table_font_size)
             # If cell contains a nested <table>, log and continue
-            if cell_html.find("table"):
+            if cell_html.find("table") != -1:
                 logger.info("nested <table> detected; docx can't represent it cleanly")
 
 
@@ -728,19 +749,31 @@ def _add_blockquote(doc, node, lock: Dict[str, Any]) -> None:
 
 
 def _add_pre(doc, node, lock: Dict[str, Any]) -> None:
-    """Add a <pre> as a monospace paragraph (preserve newlines)."""
+    """Add a <pre> as a monospace paragraph (preserve newlines).
+
+    Applies lock["formatting"]["code"] font_name / font_size if available,
+    falling back to Courier New 10pt.
+    """
     from docx.shared import Pt
+
+    code_fmt = (lock.get("formatting") or {}).get("code") or {}
+    font_name = code_fmt.get("font_name") or code_fmt.get("font") or "Courier New"
+    font_size = code_fmt.get("font_size", 10)
 
     text = node.get_text()
     for line in text.splitlines():
         p = doc.add_paragraph(style="Normal")
         run = p.add_run(line if line else " ")
-        run.font.name = "Courier New"
-        run.font.size = Pt(10)
+        run.font.name = font_name
+        run.font.size = Pt(font_size)
 
 
 def _add_hr(doc) -> None:
-    """Add a horizontal rule (paragraph with bottom border)."""
+    """Add a horizontal rule (paragraph with bottom border).
+
+    NOTE: uses w:pBdr bottom border — may conflict with paragraph spacing
+    on narrow pages. Long-term fix: use set_border() API or w:sectPr.
+    """
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
 
