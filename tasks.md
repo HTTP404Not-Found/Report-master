@@ -10,9 +10,9 @@
 |---|---|---|
 | Phase 0 基礎建設 | ✅ 5/5 (100%) | T0-4 不附字體檔，授權 metadata 完整 |
 | Phase 1 MVP（PDF） | ✅ 9/9 (100%) | 含整合 + 1 個 example |
-| Phase 2 雙格式（PDF + DOCX） | 🟡 7/9 (78%) | T2-2 reference docx + T2-3 python-docx 平行路徑是 stub |
-| Phase 3 完整 Workflow | 🟡 3/17 (18%) | T3-10 / T3-11 / T3-17 完成；workflows + CI + 範例累積待做 |
-| **整體** | **24/40 (60%)** | M2 雙格式里程碑接近（差 reference docx）；M3 待 Phase 3 補完 |
+| Phase 2 雙格式（PDF + DOCX） | ✅ 8/9 (89%) | T2-2 build_template + reference.docx 完成；T2-3 python-docx stub 預設關閉 |
+| Phase 3 完整 Workflow | 🟡 4/17 (24%) | T3-1 / T3-10 / T3-11 / T3-17 完成；workflows + CI + 範例累積待做 |
+| **整體** | **26/40 (65%)** | M2 雙格式接近（差 python-docx 平行）；M3 待 Phase 3 補完 |
 
 ---
 
@@ -161,12 +161,12 @@
   - 預估：**L**
   - DoD：*互動 10 個問題後能產出完整 lock；故意缺欄位時 BLOCKING。*
 
-- [ ] **T3-2 實作 `references/executor-base.md` + Executor workflow**
+- [x] **T3-2 實作 `references/executor-base.md` + Executor workflow**
   - 逐節生成流程；每節重讀 lock + glossary；內聯樣式優先
   - 預估：**L**
   - DoD：*對 5 章節 spec 逐節生成；中途修改 lock 後，後續節反映新設定。*
 
-- [ ] **T3-3 實作 `workflows/topic-research.md`（無源材料 workflow）**
+- [x] **T3-3 實作 `workflows/topic-research.md`（無源材料 workflow）**
   - 啟用網絡搜集；產出 Markdown 源材料；呼叫 `source_to_md/url_to_md` 收斂
   - 預估：**M**
   - DoD：*輸入「AI 對教育影響」可產出 ≥3 個 URL 的彙整 Markdown。*
