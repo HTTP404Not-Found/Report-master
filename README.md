@@ -462,6 +462,17 @@ These rules exist because we have hit the issues before — violating any of the
 
 ---
 
+
+
+## Core Fixes Applied (2026-06-13)
+
+Four fundamental workflow issues have been resolved:
+
+- ✅ **Section Blueprint**: Strategist now produces `0_outline.md` — chapter-by-chapter plan before execution
+- ✅ **User Confirmation Gate**: New `user-confirmation.md` workflow — pipeline pauses for user OK before Executor runs
+- ✅ **Web Research Integration**: `topic-research.md` updated with `research_content` stage — `web_search` fills in factual gaps per chapter
+- ✅ **DOCX Bold Formatting**: `html_to_docx_direct.py` sanitizes `**text**` → `<strong>` → `bold=True` in Word output
+
 ## License
 
 This project is released under the **MIT License**. You are free to use, modify, and redistribute it provided the copyright notice is preserved — see the full text below for details.
