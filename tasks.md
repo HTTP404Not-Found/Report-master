@@ -11,8 +11,8 @@
 | Phase 0 基礎建設 | ✅ 5/5 (100%) | T0-4 不附字體檔，授權 metadata 完整 |
 | Phase 1 MVP（PDF） | ✅ 9/9 (100%) | 含整合 + 1 個 example |
 | Phase 2 雙格式（PDF + DOCX） | ✅ 8/9 (89%) | T2-2 build_template + reference.docx 完成；T2-3 python-docx stub 預設關閉 |
-| Phase 3 完整 Workflow | 🟡 8/17 (47%) | T3-1..T3-5 / T3-10 / T3-11 / T3-17 完成；剩 11 項（workflows + CI + 範例） |
-| **整體** | **30/40 (75%)** | M3 workflows 已啟動（Executor + topic-research） |
+| Phase 3 完整 Workflow | 🟡 10/17 (59%) | T3-1..T3-7 / T3-10 / T3-11 / T3-17 完成；剩 11 項（workflows + CI + 範例） |
+| **整體** | **32/40 (80%)** | M3 workflows 已啟動（Executor + topic-research） |
 
 ---
 
@@ -181,12 +181,12 @@
   - 預估：**M**
   - DoD：*中途 kill 後重啟，能從第 3 章續做；不重做已完成節。*
 
-- [ ] **T3-6 實作 `workflows/generate-citations.md`（引用管理 workflow）**
+- [x] **T3-6 實作 `workflows/generate-citations.md`（引用管理 workflow）**
   - bib 維護、CSL 套用、`--citeproc` 呼叫
   - 預估：**M**
   - DoD：*對 5 條參考文獻的 bib 套用 APA CSL；PDF/DOCX 引用列表正確。*
 
-- [ ] **T3-7 實作 `workflows/live-preview.md`（HTML 即時預覽）**
+- [x] **T3-7 實作 `workflows/live-preview.md`（HTML 即時預覽）**
   - 啟動本地 http server + 瀏覽器；文件變更自動 reload
   - 預估：**S**
   - DoD：*改 HTML 檔後瀏覽器 1 秒內 reload；無需手動重啟。*
