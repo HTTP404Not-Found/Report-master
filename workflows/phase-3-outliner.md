@@ -13,6 +13,8 @@ version: "1.0"
 >   2. `report_output/0_outline_for_review.md`（**人讀**摘要，給使用者看——Problem 2 解）
 > **輸入物**：`report_output/0_strategist.md`（含 RQ1…RQn 收斂結果）
 
+> **📝 實作狀態說明**：本文檔描述 RQ-based 設計（來源：`scripts/outliner.py` 原始設計，commit `9efa7ad`）。實際工作中的 `scripts/outliner.py` 是 topic/audience-based（commit `abe60fe`，D1 smoke test 驗證通過）。兩者設計哲學不同：文檔是理想規格，實際是經測試的可跑版本。
+
 > **本檔是 user-facing workflow；schema 細節見 §4。**
 
 ---
