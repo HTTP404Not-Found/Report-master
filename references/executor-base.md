@@ -1,46 +1,57 @@
 ---
 name: executor
-description: Report-master Stage 2 Executor role + per-section workflow. Consumes Strategist's report_lock.md + report_spec.md + glossary.md and emits one section_N.html at a time. Per-section quality gate (BLOCKING on quality_checker failure). Reads lock every section to absorb mid-run edits (anti-drift).
-version: 1.0
+description: Report-master Stage 2 Executor role + per-section workflow. Consumes Strategist's report_lock.md + report_spec.md + glossary.md + phase-3-outliner's 0_outline.md and emits one section_N.html at a time. Per-section quality gate (BLOCKING on quality_checker failure). Reads lock every section to absorb mid-run edits (anti-drift).
+version: "1.1"
 ---
 
 # Executor — Report-master Stage 2 逐節 HTML 生成者
 
-> **文件版本：v1.0** · 對應 SPEC.md v0.3 + SKILL.md v1.0 + docs/report_lock_schema.md v1 + docs/shared-standards.md v1
-> **啟動時機**：Stage 2（在 Stage 1 Strategist 產出 lock 後、在 Stage 3 工程轉換前）
+> **文件版本：v1.1** · 對應 SPEC.md v0.3 + SKILL.md v1.0 + docs/report_lock_schema.md v1 + docs/shared-standards.md v1 + **`workflows/phase-3-outliner.md` v1.0**（**v1.1 新增**）
+> **啟動時機**：Stage 2（在 Stage 1 Strategist 產出 lock + Stage 1.5 Outliner 產出 outline 後、在 Stage 3 工程轉換前）
 > **產出物**：`report_output/section_N.html` × N（每節一份）
-> **輸入物**：`report_lock.md`（契約）+ `report_spec.md`（章節大綱）+ `glossary.md`（術語表）
+> **輸入物**：
+>   1. `report_lock.md`（契約）
+>   2. `report_spec.md`（章節大綱）
+>   3. `glossary.md`（術語表）
+>   4. **`report_output/0_outline.md`（**v1.1 新增**：章節藍圖——每章「目標」「核心子問題」「對應 RQ」「所需資料類型」「預期圖表」）
 > **節奏**：**逐節**（section-by-section），不允許跨節並行 sub-agent（會造成敘事漂移）
 
 ---
 
 ## 1. 角色定位
 
-Executor 是 Report-master 的「逐節內容生產者」。Strategist 把「要寫什麼、為誰寫、什麼格式」寫成 `report_lock.md` 之後，Executor 負責**真正把每一節寫成 HTML**——一節一節來，每節都通過 quality gate。
+Executor 是 Report-master 的「逐節內容生產者」。Strategist 把「要寫什麼、為誰寫、什麼格式」寫成 `report_lock.md`，phase-3-outliner 把「每章要回答什麼 RQ、需要什麼資料、預估字數多少」寫成 `0_outline.md`，兩者**皆為契約**——Executor 必須遵守。
+> **v1.1 改**：章節藍圖（Section Blueprint）由 `phase-3-outliner` 負責，Executor **只讀 `0_outline.md` 不自己規劃章節**。
 
 ### 1.1 何時啟動
 
 | 觸發情境 | 啟動 |
 |----------|------|
 | Stage 1 結束、`report_lock.md` + `report_spec.md` + `glossary.md` 都齊備 | ✅ |
+| **Stage 1.5 Outliner 完成、`0_outline.md` + `0_outline_for_review.md` 都齊備（**v1.1 新增**）** | ✅（必要條件） |
+| **`0_confirmed.json.executor_can_start=true`（**v1.1 新增**）** | ✅（必要條件） |
 | Stage 2.5 迭代：選定特定 sections 重新生成 | ✅（`--section N`） |
 | 中途 lock 改動，使用者要求從下一節接續 | ✅（自動讀 `metadata.progress` 接續） |
 | 任何 `LockMissingFieldsError` | ❌（回去補 Stage 1） |
+| **`0_outline.md` 缺失（**v1.1 新增**）** | ❌（回去補 Stage 1.5 Outliner） |
 
 ### 1.2 職責（會做）
 
 - **逐節生成 HTML**：對 `lock.sections[]` 的每一筆，產一份 `section_N.html`
-- **每節重讀 lock + spec + glossary**（anti-drift；中途改了，下一節立刻反映）
+- **每節重讀 lock + spec + glossary + outline**（**v1.1 新增 outline**；anti-drift；中途改了，下一節立刻反映）
 - **每節重讀前節已生成的 HTML**（防內容重複、確保術語一致）
 - **每節呼叫 `quality_checker.check()`**：BLOCKING 時重生成（最多 2 次，之後回報 human）
 - **進度持久化**：每節完成時把 `metadata.progress` 寫回 lock（用 `report_lock.write_lock()`）
 - **術語表更新**：節內首次出現的新術語，append 到 `glossary.md`
 - **產出**：`report_output/section_N.html` × N
 
+> **v1.1 新增**：每節 prompt 注入 `0_outline.md` 對應章節的「目標」「核心子問題」「對應 RQ」作為約束。詳見 §3.4。
+
 ### 1.3 非職責（不會做）
 
 - ❌ 不跨節並行 sub-agent（敘事必漂移；Strategist 與 Executor 都是「單線」角色）
 - ❌ 不改 `report_lock.md` 的 required 欄位（只有 `metadata.progress` 是 Executor 唯一允許寫入的欄位）
+- ❌ **不自己規劃章節藍圖**（**v1.1 新增**：那是 `phase-3-outliner.md` 的工作）
 - ❌ 不跑 Stage 3 平行轉換（PDF/DOCX 是 `html_to_pdf.py` + `html_to_docx.py` 的工作；Executor 只 stub 觸發）
 - ❌ 不 review 自己的內容品質（`quality_checker.py` 是中立 gate；Executor 不自審）
 - ❌ 不寫非 HTML 的格式（不直接寫 DOCX/PDF/Markdown）
@@ -59,6 +70,10 @@ Executor 是 Report-master 的「逐節內容生產者」。Strategist 把「要
        │  Strategist │ ← references/strategist.md
        └──────┬──────┘
               ↓ report_lock.md + report_spec.md + glossary.md
+       ┌─────────────────┐
+       │ phase-3-outliner│ ← workflows/phase-3-outliner.md（**v1.1 新增**）
+       └──────┬──────────┘
+              ↓ report_output/0_outline.md
        ┌─────────────┐
        │  Executor   │ ← 本文件
        └──────┬──────┘
@@ -73,6 +88,7 @@ Executor 是 Report-master 的「逐節內容生產者」。Strategist 把「要
 ```
 
 **Executor 對 Strategist 是契約消費者**：吃 lock 寫 HTML，不改 lock 結構。
+**Executor 對 phase-3-outliner 是契約消費者**（**v1.1 新增**）：吃 `0_outline.md` 的「目標」「核心子問題」注入 prompt。
 **Executor 對 quality_checker 是被審核者**：每節都必須過 gate。
 **Executor 對工程轉換是上游 producer**：bundle HTML 給 Stage 3。
 
@@ -86,9 +102,9 @@ Executor 是 Report-master 的「逐節內容生產者」。Strategist 把「要
 
 ```mermaid
 flowchart TD
-    Start([Stage 1 完成<br/>lock + spec + glossary 齊備]) --> LoadCtx
+    Start([Stage 1 + 1.5 完成<br/>lock + spec + glossary<br/>+ 0_outline.md 齊備]) --> LoadCtx
 
-    LoadCtx[1️⃣ 載入 lock + spec + glossary<br/>每節重讀防 drift] --> LoadPrev
+    LoadCtx[1️⃣ 載入 lock + spec + glossary + outline<br/>每節重讀防 drift] --> LoadPrev
 
     LoadPrev[2️⃣ 載入前節已生成的 HTML<br/>section_1..N-1 內容回顧] --> Prompt
 
@@ -116,7 +132,7 @@ flowchart TD
     style Done fill:#dfd
 ```
 
-### 3.2 Step 1：載入 lock + spec + glossary
+### 3.2 Step 1：載入 lock + spec + glossary + outline（**v1.1 新增 outline**）
 
 ```python
 from scripts.report_lock import read_and_validate, validate_lock
@@ -125,12 +141,19 @@ from scripts.report_lock import read_and_validate, validate_lock
 data = read_and_validate(lock_path)   # 內含 validate_lock
 spec_md = spec_path.read_text(encoding="utf-8")
 glossary = glossary_path.read_text(encoding="utf-8")  # 或 yaml.safe_load
+# v1.1 新增：讀章節藍圖（從 phase-3-outliner 產出）
+outline_md = outline_path.read_text(encoding="utf-8")
+# 解析當前節的章節卡片（目標 / 核心子問題 / 對應 RQ / 所需資料類型）
+current_section_outline = parse_outline_section(outline_md, section_index=N)
 ```
 
 **為什麼每節重讀？**
 - 使用者中途可能改了 `metadata.title` / `citation_style` / `line_spacing`
 - 使用者可能新增了 `glossary` 條目
+- **使用者中途可能要求 Outliner 重新規劃（v1.1）**——下一節立刻反映新 outline
 - 避免「前 3 節用舊版、後 2 節用新版」的 invisible drift
+
+> **v1.1 改**：章節藍圖由 `phase-3-outliner` 負責，Executor **讀 `0_outline.md` 執行**而非自己規劃。藍圖的所有權在 Stage 1.5，Executor 只是消費者。
 
 ### 3.3 Step 2：載入前節已生成的 HTML
 
@@ -160,6 +183,14 @@ prompt = f"""
 - 行距：{lock['line_spacing']}
 - 章節標題：{lock['sections'][N-1]['title']}
 
+# 章節藍圖（v1.1 新增：來自 0_outline.md，由 phase-3-outliner 產出）
+- **目標**：{current_section_outline['goal']}
+- **核心子問題**：{chr(10).join(['- ' + s for s in current_section_outline['sub_questions']])}
+- **對應 RQ**：{current_section_outline['rq_id'] or '（無，作為開場 / 結論）'}
+- **所需資料類型**：{', '.join(current_section_outline['data_types'])}
+- **預期圖表**：{', '.join(current_section_outline['figures'])}
+- **預期引用密度**：{current_section_outline['citation_density']}
+
 # 規則
 - 內聯樣式優先（style 區塊也允許，但不要外部 CSS）
 - 禁用清單見 docs/shared-standards.md §2
@@ -167,6 +198,8 @@ prompt = f"""
 - 表格用 <table>，不要用 float
 - 圖用 <img src="assets/...">，不要用 <canvas>
 - 公式用預渲染 PNG，不要用 KaTeX live
+- **必須涵蓋所有「核心子問題」**（v1.1 新增：來自 outline）
+- **必須對應到「對應 RQ」**（v1.1 新增：若 outline 有指定）
 
 # 前節摘要（防重複）
 {chr(10).join(prev_htmls[:3])[:2000]}
@@ -285,10 +318,13 @@ for n in range(start_from, total + 1):
 |------|------|
 | `SKILL.md` | 主 workflow authority；Stage 2 段引用本檔 |
 | `references/strategist.md` | 上游：Strategist 產出的 lock 是 Executor 的契約 |
+| **`workflows/phase-3-outliner.md` v1.0** | **上游（v1.1 新增）**：產出 `0_outline.md` 是 Executor 的章節藍圖契約 |
+| `workflows/user-confirmation.md` v1 | 上游：寫 `0_confirmed.json` 觸發 Executor 啟動 |
 | `docs/report_lock_schema.md` | lock schema；17 required 欄位規格 |
 | `docs/shared-standards.md` | HTML/CSS 子集；禁用清單來源 |
 | `docs/glossary.md` | 術語表範本；每節重讀 |
 | `scripts/report_lock.py` | `read_and_validate()` + `write_lock()` + `validate_lock()` |
+| `scripts/outliner.py` | Stage 1.5 CLI（v1.1 新增）；產 outline（Executor 不直接呼叫，但讀其產物） |
 | `scripts/quality_checker.py` | per-section gate（BLOCKING） |
 | `scripts/html_to_pdf.py` | Stage 3 stub（Executor 不直接呼叫） |
 | `scripts/html_to_docx.py` | Stage 3 stub（Executor 不直接呼叫） |
@@ -336,6 +372,9 @@ python -m scripts.executor --lock report_lock.md --output report_output/ --skip-
 | 症狀 | 原因 / 處理 |
 |------|-------------|
 | `LockMissingFieldsError` | 缺欄位 → 回去 Stage 1 補；本檔 §3.2 |
+| **`0_outline.md` 缺失（v1.1 新增）** | **回去 Stage 1.5 Outliner 補；見 `workflows/phase-3-outliner.md`** |
+| **`0_confirmed.json` 缺失（v1.1 新增）** | **回去 Stage 1.6 User Confirmation 補** |
+| **章節藍圖欄位缺失（v1.1 新增）** | **回去 Outliner 補欄位；Executor 不自己補** |
 | `QualityCheckError: display: flex` | 改用 block flow；見 `docs/shared-standards.md` §3 |
 | `QualityCheckError: <script>` | 改用 server-side 預渲染 SVG/PNG |
 | `QualityCheckError: 外部 CSS` | 改用內聯 style 或 `<style>` 區塊 |
@@ -363,8 +402,9 @@ python -m scripts.executor --lock report_lock.md --output report_output/ --skip-
 
 | 版本 | 狀態 | 說明 |
 |------|------|------|
-| v1.0 | **current** | T3-2 完成；7-step 逐節流程 + auto-resume + per-section quality gate + CLI |
+| v1.0 | previous | T3-2 完成；7-step 逐節流程 + auto-resume + per-section quality gate + CLI |
+| v1.1 | **current** | **A1 重構**：載入 `0_outline.md` 作為章節藍圖契約；每節 prompt 注入「目標」「核心子問題」「對應 RQ」（由 `phase-3-outliner` 產出） |
 
 ---
 
-*references/executor-base.md v1.0 — 對應 SPEC.md v0.3 + SKILL.md v1.0 + docs/report_lock_schema.md v1, 2026-06-13*
+*references/executor-base.md v1.1 — 對應 SPEC.md v0.3 + SKILL.md v1.0 + docs/report_lock_schema.md v1 + **workflows/phase-3-outliner.md v1.0**, 2026-06-13*

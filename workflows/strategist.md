@@ -1,28 +1,31 @@
 ---
 name: strategist
-description: Report-master Stage 1 user-facing workflow. Converges user intent into a Section Blueprint, then PAUSES for explicit user confirmation (章節架構、標題、順序、預期頁數), then emits report_lock.md. Refuses to enter Stage 2 until user OK. Use as the entry point when starting a new report from scratch or from a single topic.
-version: "1.1"
+description: Report-master Stage 1 user-facing workflow. Converges user intent via 10 Confirmations, then DELEGATES chapter blueprinting to phase-3-outliner (Stage 1.5), then PAUSES for user confirmation, then emits report_lock.md. Refuses to enter Stage 2 until user OK. Use as the entry point when starting a new report from scratch or from a single topic.
+version: "1.2"
 ---
 
 # strategist — Report-master Stage 1 規劃者 workflow（使用者面向）
 
-> **文件版本：v1.1** · 對應 SPEC.md v0.3 + SKILL.md v1.0 + `references/strategist.md` v1 + `references/executor-base.md` v1 + `workflows/user-confirmation.md` v1 + `workflows/topic-research.md` v1
+> **文件版本：v1.2** · 對應 SPEC.md v0.3 + SKILL.md v1.0 + `references/strategist.md` v1 + `references/executor-base.md` v1 + `workflows/user-confirmation.md` v1 + `workflows/topic-research.md` v1 + **`workflows/phase-3-outliner.md` v1.0**（**v1.2 新拆分**）
 > **啟動時機**：Stage 1（在 Stage 0 source probe 完成後、在 Stage 2 Executor 開工前）
 > **產出物**：
->   1. `report_output/0_outline.md`（**Section Blueprint**，章節藍圖 — 新增，Problem 1）
->   2. `report_output/0_outline_for_review.md`（給使用者看 — Problem 2）
->   3. `report_output/0_confirmed.json`（確認旗標 — Problem 2）
->   4. `report_lock.md`（17 個 required 欄位齊備）
->   5. `report_spec.md`（章節大綱 + 預期圖表 + 引用清單）
+>   1. `report_output/0_strategist.md`（intent brief；含 RQ1…RQn — **v1.2 新增**）
+>   2. `report_lock.md`（17 個 required 欄位齊備）
+>   3. `report_spec.md`（章節大綱 + 預期圖表 + 引用清單）
+>   4. `glossary.md`（≥ 3 條術語）
 > **輸入物**：Stage 0 收斂後的 `normalized.md`、使用者口頭 / 文字需求、或 topic-research 的 `research_notes.md`
 
 > **本檔是 user-facing workflow；Stage 1 的 schema 細節見 `references/strategist.md` v1。**
+>
+> **v1.2 重構說明**：章節藍圖（Section Blueprint）從 Strategist 拆出為獨立 Stage 1.5 workflow，見 `workflows/phase-3-outliner.md` v1.0。Strategist 收斂意圖 → Outliner 規劃章節 → User 確認 → Executor 執行。
 
 ---
 
 ## 1. 角色定位
 
 Strategist 是 Report-master 的「**規劃者**」，負責在 Stage 1 將**模糊的使用者需求**收斂成**機器可讀的執行合同**——但在交給 Executor 之前，**必須先讓使用者確認章節藍圖**，避免 Executor 寫出來才發現「順序不對」「少了一章」。
+
+**v1.2 拆分後**：Strategist 收斂意圖並產出 `0_strategist.md`（含 RQ1…RQn），接著交棒給 `phase-3-outliner.md`（Stage 1.5）做章節藍圖規劃，**再**進入 User Confirmation。
 
 ### 1.1 何時啟動
 
@@ -33,15 +36,18 @@ Strategist 是 Report-master 的「**規劃者**」，負責在 Stage 1 將**模
 | Stage 2 Executor 報 `LockMissingFieldsError` | ✅（回去補 Stage 1） |
 | Stage 2.5 迭代時大改（>30% 內容） | ✅（回到 Stage 1 重跑） |
 | topic-research 跑完，有 `research_notes.md` | ✅（吃 research_notes 收斂） |
+| Outliner（Stage 1.5）已產出 outline 但 `0_confirmed.json` 缺失 | ✅（補產 lock + spec + glossary） |
 
 ### 1.2 職責（會做）
 
 1. **10 Confirmations 對話**（schema 細節見 `references/strategist.md` §3）
-2. **Section Blueprint 產出**（**Problem 1** 修）：把章節結構、層級、每章目標、預期頁數寫成 `report_output/0_outline.md`
-3. **User Confirmation Loop**（**Problem 2** 修）：停下來等使用者看過 blueprint 再說 OK
+2. **產出 intent brief `0_strategist.md`**（**v1.2 新增**）：收斂 RQ1…RQn（含 angle、priority、estimated_pages），交給 Outliner
+3. **User Confirmation Loop**（**Problem 2** 修）：讀 Outliner 產出的 `0_outline_for_review.md`，等使用者說 OK 再繼續
 4. 確認後產出 `report_lock.md`（17 欄位齊備）
 5. 確認後產出 `report_spec.md`（章節大綱 + 預期圖表）
 6. 確認後產出 / 更新 `glossary.md`
+
+> **See also**: 章節藍圖（Section Blueprint）的完整產出流程見 **`workflows/phase-3-outliner.md` v1.0**。本檔只負責 intent brief 收斂 + confirmation + lock/spec/glossary，不直接產 outline。
 
 ### 1.3 非職責（不會做）
 
@@ -49,6 +55,7 @@ Strategist 是 Report-master 的「**規劃者**」，負責在 Stage 1 將**模
 - ❌ 不跑 Stage 2 / Stage 3
 - ❌ 不 review 內容品質
 - ❌ 不跨節並行 sub-agent
+- ❌ **不直接產章節藍圖**（**v1.2 改**：那是 `phase-3-outliner.md` 的工作）
 - ❌ **不會自動跳過使用者確認**（這是 Problem 2 的根因）
 
 ---
@@ -61,10 +68,14 @@ Strategist 是 Report-master 的「**規劃者**」，負責在 Stage 1 將**模
        └──────┬──────┘
               ↓ 10 個問題
        ┌─────────────────┐
-       │   Strategist    │ ← 本文件
+       │   Strategist    │ ← 本文件（Stage 1）
+       └──────┬──────────┘
+              ↓ report_output/0_strategist.md
+              ↓ (intent brief + RQ1…RQn)
+       ┌─────────────────┐
+       │ phase-3-outliner│ ← workflows/phase-3-outliner.md（Stage 1.5）
        └──────┬──────────┘
               ↓ report_output/0_outline.md
-              ↓ (Section Blueprint)
               ↓ report_output/0_outline_for_review.md
        ┌─────────────────┐
        │  🔔 停等確認      │ ← workflows/user-confirmation.md
@@ -72,7 +83,7 @@ Strategist 是 Report-master 的「**規劃者**」，負責在 Stage 1 將**模
               ↓ 使用者說「OK」/「修改」
               ↓ report_output/0_confirmed.json
        ┌─────────────────┐
-       │   Strategist    │ ← 產 lock + spec + glossary
+       │   Strategist    │ ← 補產 lock + spec + glossary
        └──────┬──────────┘
               ↓ report_lock.md + report_spec.md
        ┌─────────────────┐
@@ -84,25 +95,28 @@ Strategist 是 Report-master 的「**規劃者**」，負責在 Stage 1 將**模
        └─────────────────┘
 ```
 
-**Strategist 對 Executor 是契約關係**：lock 產出後 Executor 必須遵守。
-**Strategist 對使用者是合約協商關係**：blueprint 必須經使用者確認（**新增**，舊版漏了這一步）。
+**Strategist 對 Outliner 是上游提供者**：給 RQs 讓 Outliner 規劃章節。
+**Strategist 對 Executor 是契約消費者**：吃 `0_outline.md` 帶入 lock 的 `sections[]`，Executor 必須遵守。
+**Strategist 對使用者是合約協商關係**：outline 必須經使用者確認（**新增**，舊版漏了這一步）。
 
 ---
 
 ## 3. 完整 4 階段流程（Mermaid）
 
+> **v1.2 更新**：原本的「Section Blueprint 產出」階段從本檔拆出，獨立成 `phase-3-outliner.md` 的 Stage 1.5。
+
 ```mermaid
 flowchart TD
     Start([Stage 0 完成<br/>normalized.md 就緒<br/>或 topic 已給]) --> Q1
 
-    Q1{1️⃣ 10 Confirmations 對話<br/>type/title/page/font/cite/<br/>sections/page_count/<br/>special/source/format} -->|答完| Blueprint
+    Q1{1️⃣ 10 Confirmations 對話<br/>type/title/page/font/cite/<br/>sections/page_count/<br/>special/source/format} -->|答完| Brief
 
-    Blueprint[2️⃣ 產 Section Blueprint<br/>report_output/0_outline.md<br/>章節大綱+層級+每章目標] --> ForReview
+    Brief[2️⃣ 產 intent brief<br/>report_output/0_strategist.md<br/>含 RQ1…RQn] --> Out
 
-    ForReview[3️⃣ 產 For-Review 版本<br/>report_output/0_outline_for_review.md<br/>給使用者看] --> Pause
+    Out[3️⃣ phase-3-outliner<br/>產 0_outline.md<br/>+ 0_outline_for_review.md<br/>見 workflows/phase-3-outliner.md] --> Pause
 
     Pause{🔔 停等使用者確認<br/>via user-confirmation<br/>workflow} -->|OK| Lock
-    Pause -->|要修改| Q1
+    Pause -->|要修改| Out
     Pause -->|要重來| Q1
 
     Lock[4️⃣ 產 0_confirmed.json<br/>+ report_lock.md<br/>+ report_spec.md<br/>+ glossary.md] --> Validate
@@ -114,14 +128,15 @@ flowchart TD
     Done([Stage 1 完成<br/>→ Stage 2 Executor])
 
     style Pause fill:#ffd,stroke:#f80,stroke-width:2px
-    style Blueprint fill:#dfd
-    style ForReview fill:#dfd
+    style Brief fill:#dfd
+    style Out fill:#dfd
     style Lock fill:#dfd
     style Done fill:#dfd
     style Fix fill:#fdd
 ```
 
 > **關鍵節點**：`Pause` 是 **Problem 2 修**的核心——沒有 `0_confirmed.json`，Executor 拒絕啟動。
+> **v1.2 改**：`Out`（Outliner）是獨立 Stage 1.5，詳見 `workflows/phase-3-outliner.md` v1.0。
 
 ---
 
@@ -146,118 +161,55 @@ flowchart TD
 
 ---
 
-## 5. 階段 2 — Section Blueprint 產出（**Problem 1 修**）
+## 5. 階段 2 — 產出 Intent Brief `0_strategist.md`（**v1.2 新增**）
 
 ### 5.1 設計動機
 
-舊版 Strategist 直接把 Q6 的章節大綱（5-7 個章節標題）寫進 `report_lock.md` 就算完工。問題是：
+v1.1 把章節藍圖（Section Blueprint）塞在 Strategist 流程內，導致：
 
-- ❌ Q6 只給「標題」+「path」，沒有「章節層級」「每章目標」「預估頁數」
-- ❌ Executor 拿到 lock 後只能憑標題猜每一章要寫什麼
-- ❌ 結果：常見 drift 模式 = 「章節順序亂」「少關鍵主題」「結論比緒論長」
+- ❌ Strategist 流程臃腫（> 450 行）
+- ❌ 「藍圖規劃」與「意圖收斂」責任邊界模糊
+- ❌ 順序檢查、粒度統一、章節類型判定等邏輯沒有獨立的 ownership
 
-### 5.2 產物：`report_output/0_outline.md`（Section Blueprint）
+**v1.2 解法**：把藍圖拆成獨立 Stage 1.5 workflow（`phase-3-outliner.md`）。Strategist 只負責收斂意圖並產 `0_strategist.md`（含 RQ1…RQn），把章節規劃交給 Outliner。
 
-**Blueprint 包含的內容**：
+### 5.2 產物：`report_output/0_strategist.md`（Intent Brief）
+
+**Intent brief 包含的內容**：
 
 ```markdown
-# Section Blueprint — {title}
-
-> 對應 `workflows/strategist.md` v1.1（Stage 1 階段 2）
-> 報告：{title}
-> 作者：{author}
-> 日期：{date}
-> 總章節數：{N}
-> 預估總頁數：{page_range}
-
-## 章節藍圖
-
-### 第 1 章：{chapter_1_title}（H1）
-- **目標**：本章要回答的核心問題（1-2 句）
-- **預估頁數**：~{N1} 頁
-- **重點子節**：
-  - {sub_topic_1}
-  - {sub_topic_2}
-  - {sub_topic_3}
-- **對應 sub-question**（若有）：{sq_id}
-- **預期圖表**：Figure {X}, Table {Y}
-- **預期引用密度**：{high | medium | low}
-- **備註**：{optional free text}
-
-### 第 2 章：{chapter_2_title}（H1）
-- **目標**：...
-...
-
-## 全域規劃
-
-- **圖總數**：{fig_count}（Figure 1 ~ {fig_count}）
-- **表總數**：{tbl_count}（Table 1 ~ {tbl_count}）
-- **引用總數**：~{cite_count} 條
-- **特殊元素**：{mermaid / katex / code_block}
-- **預估完成時間**：{hours}
-
-## 給 Executor 的提示
-
-- 每節 prompt 會附本章「目標」與「重點子節」作為約束
-- mid-run 改 blueprint → 走 Stage 2.5（delta_checker → 單節重跑）
+---
+metadata:
+  title: "報告標題"
+  type: "academic" | "business" | "spec" | "gov" | "custom"
+  author: "..."
+  date: "2026-06-13"
+research_questions:
+  - id: RQ1
+    question: "本章要回答的核心問題"
+    angle: "現況 / 實證 / 風險 / 比較 / 政策 / 成本 / 情境"
+    priority: high | medium | low
+    estimated_pages: 8
+  - id: RQ2
+    ...
+constraints:
+  total_pages: "30-50"
+  citation_style: "APA"
+  language: "zh-TW"
+---
 ```
 
 ### 5.3 設計細節
 
-**為什麼分「目標」「重點子節」「預估頁數」「預期圖表」？**
-
 | 欄位 | 給誰用 | 用來做什麼 |
 |------|--------|-----------|
-| 目標 | LLM prompt 注入 | 防止每節寫偏題 |
-| 重點子節 | LLM prompt 注入 | 防止遺漏關鍵主題 |
-| 預估頁數 | live-preview | 渲染時提醒長度 |
-| 預期圖表 | Executor | 預先規劃 assets/ 目錄 |
-| 預期引用密度 | Executor + citation_manager | 決定 References 章節厚度 |
+| `research_questions[].question` | Outliner | 配對成 H1 章節核心問題 |
+| `research_questions[].angle` | Outliner | 推斷章節類型與所需資料 |
+| `research_questions[].priority` | Outliner + Executor | 決定引用密度與章節深度 |
+| `research_questions[].estimated_pages` | Outliner | 估算章節字數（頁數 × 500） |
+| `constraints` | Strategist | 帶入 `report_lock.md` 的契約欄位 |
 
-### 5.4 範例
-
-```markdown
-# Section Blueprint — 生成式 AI 對教育的影響
-
-> 總章節數：5
-> 預估總頁數：30-50 頁
-
-## 章節藍圖
-
-### 第 1 章：緒論（H1）
-- **目標**：交代研究背景、目的、章節安排
-- **預估頁數**：~3 頁
-- **重點子節**：
-  - 研究背景與動機
-  - 研究問題與目的
-  - 章節安排
-- **對應 sub-question**：（無，作為開場）
-- **預期圖表**：無
-- **預期引用密度**：low
-
-### 第 2 章：生成式 AI 在 K-12 的應用現況（H1）
-- **目標**：盤點各國生成式 AI 進入教室的場景
-- **預估頁數**：~10 頁
-- **重點子節**：
-  - 美國 / 歐盟 / 亞洲政策比較
-  - 教師採用率調查
-  - 典型工具與案例（ChatGPT / Gemini / Claude）
-- **對應 sub-question**：Q1
-- **預期圖表**：Figure 1（採用率長條圖）、Table 1（政策時序表）
-- **預期引用密度**：high
-- **備註**：需上網搜尋最新政策動態（觸發 research_content）
-
-### 第 3 章：對學習成效的影響（H1）
-...
-
-## 全域規劃
-
-- **圖總數**：3（Figure 1-3）
-- **表總數**：2（Table 1-2）
-- **引用總數**：~30 條
-- **特殊元素**：mermaid（畫一張政策時序圖）
-- **預估完成時間**：~4 小時
-```
+> **詳見 `workflows/phase-3-outliner.md` v1.0** 取得章節藍圖的完整產出流程（schema、順序檢查、粒度規則、2 個範例）。
 
 ---
 
@@ -267,67 +219,19 @@ flowchart TD
 
 ### 6.1 為什麼需要確認 loop？
 
-**舊版問題**：Strategist 跑完 10 Confirmations 後直接寫 `report_lock.md`，Executor 接力開始寫 HTML。問題是：
+v1.0 的問題：Strategist 跑完 10 Confirmations 後直接寫 `report_lock.md`，Executor 接力開始寫 HTML。問題是：
 
 - 使用者可能誤解了 Q6 的章節標題（Executor 不會再問）
 - 使用者可能忘了某個關鍵主題（等到 Stage 2.5 發現要整段重寫）
 - Executor 一旦開工就不容易回頭（spec_lock anti-drift 設計）
 
-**解法**：在 Strategist 與 Executor 之間插入一個 **顯式的確認 gate**。
+**v1.2 解法**：Strategist 收斂意圖 → Outliner 產 `0_outline.md` + `0_outline_for_review.md` → Main agent 把 `0_outline_for_review.md` 給使用者看 → 寫 `0_confirmed.json` → Strategist 補產 lock + spec + glossary → Executor 啟動。
 
 ### 6.2 確認格式
 
-**產物 1**：`report_output/0_outline_for_review.md`（人讀）
+**產物 1**：`report_output/0_outline_for_review.md`（人讀；由 Outliner 產出）
 
-```markdown
-# 🔔 Stage 1 確認請求 — 請檢視後回覆 OK / 修改
-
-> 對應 `workflows/strategist.md` v1.1 + `workflows/user-confirmation.md` v1
-> 等待時間：Stage 1 → Stage 2 之間的必要 gate
-> 確認前不會啟動 Executor。
-
-## 待確認項目
-
-1. **章節架構**（5 章）：
-   - 第 1 章：緒論 ✅ / ❌
-   - 第 2 章：生成式 AI 在 K-12 的應用現況 ✅ / ❌
-   - 第 3 章：對學習成效的影響 ✅ / ❌
-   - 第 4 章：風險與倫理反思 ✅ / ❌
-   - 第 5 章：結論與未來展望 ✅ / ❌
-
-2. **章節順序**：1→2→3→4→5 ✅ / ❌
-
-3. **每章預估頁數**：
-   - 第 1 章：~3 頁 ✅ / ❌
-   - 第 2 章：~10 頁 ✅ / ❌
-   ...
-
-4. **每章目標**（重點子節是否正確）：
-   - 第 2 章：包含「美歐亞政策比較」 ✅ / ❌
-   ...
-
-5. **預期圖表總數**：3 圖 + 2 表 ✅ / ❌
-
-6. **特殊元素**：mermaid ✅ / ❌
-
-7. **引用條目數**：~30 條 ✅ / ❌
-
-## 回覆方式
-
-- **全部 OK**：回覆「OK」或「✅」即可
-- **部分要修改**：列出要改的章節與內容
-- **整體重來**：回覆「REDO」回到 Q1
-
-## 確認後
-
-確認後會自動產出：
-- `report_output/0_confirmed.json`（給 Executor 的觸發開關）
-- `report_lock.md`（17 欄位齊備）
-- `report_spec.md`（章節大綱）
-- `glossary.md`（≥ 3 條術語）
-
-然後 Stage 2 Executor 啟動。
-```
+> Schema 與範例見 `workflows/phase-3-outliner.md` §4.3 與 §6 / §7。
 
 **產物 2**：`report_output/0_confirmed.json`（機讀，Executor 觸發開關）
 
@@ -350,27 +254,7 @@ flowchart TD
 }
 ```
 
-### 6.3 確認流程（Mermaid）
-
-```mermaid
-sequenceDiagram
-    participant U as 使用者
-    participant S as Strategist
-    participant W as 確認工作流
-    participant E as Executor
-
-    S->>W: 產 0_outline_for_review.md
-    W-->>U: 顯示待確認項目
-    Note over U: 使用者檢視 5-10 分鐘
-    U->>W: 回覆「OK」/「修改 X 章」/「REDO」
-    W->>W: 寫 0_confirmed.json
-    W->>S: 通知 confirmation.status = ok
-    S->>S: 產 report_lock.md + spec + glossary
-    S->>E: Stage 2 啟動
-    Note over E: 讀 0_confirmed.json 確認 executor_can_start=true
-```
-
-### 6.4 拒絕啟動的保護
+### 6.3 拒絕啟動的保護
 
 Executor 在啟動前必須檢查：
 
@@ -382,7 +266,7 @@ confirmed_path = Path("report_output/0_confirmed.json")
 if not confirmed_path.exists():
     raise FileNotFoundError(
         "[BLOCKING] 找不到 0_confirmed.json。"
-        "請先跑 Stage 1 Strategist 並完成 user confirmation。"
+        "請先跑 Stage 1 Strategist + phase-3-outliner 並完成 user confirmation。"
     )
 
 data = json.loads(confirmed_path.read_text(encoding="utf-8"))
@@ -407,14 +291,14 @@ if not data.get("executor_can_start"):
 - `page_size` / `margins` / `line_spacing`
 - `language_variant` / `citation_style`
 - `output.docx_engine`
-- `sections[]`（從 blueprint 帶入）
+- `sections[]`（從 `0_outline.md` 帶入；**v1.2 改**：不再是從 Q6 帶入）
 
 ### 7.2 `report_spec.md`
 
-- 章節大綱（從 blueprint 帶入）
+- 章節大綱（從 `0_outline.md` 帶入；**v1.2 改**）
 - 預期圖表清單
 - 引用條目數
-- 每章預估頁數（**新增**，來自 blueprint）
+- 每章預估頁數（從 Outliner 帶入）
 
 ### 7.3 `glossary.md`
 
@@ -422,15 +306,16 @@ if not data.get("executor_can_start"):
 
 ---
 
-## 8. 失敗 / 求助指引（新增 confirmation 相關）
+## 8. 失敗 / 求助指引（confirmation 相關）
 
 | 症狀 | 原因 / 處理 |
 |------|-------------|
+| `0_strategist.md` 缺 `research_questions` | BLOCKING；Strategist 必須完成 10 Confirmations 才能往下 |
 | `0_outline_for_review.md` 產出後沒人回覆 | 等待中；提醒使用者或預設 24h 逾時 |
-| 使用者回覆「修改第 3 章」但沒給改什麼 | 回到 Q1（具體修改需明確說明） |
+| 使用者回覆「修改第 3 章」但沒給改什麼 | 回到 Outliner（具體修改需明確說明） |
 | `0_confirmed.json` 不存在 / `executor_can_start=false` | Executor 拒絕啟動；回去 Strategist |
-| 使用者要求新增章節 | 回到 Q1 重做 blueprint；不走 incremental |
-| blueprint 與 lock 不一致 | BLOCKING；Strategist 必須保證 blueprint → lock 是 deterministic |
+| 使用者要求新增章節 | 回到 Outliner 重做；不走 incremental |
+| `0_outline.md` 與 lock 不一致 | BLOCKING；Strategist 必須以 outline 為 source of truth 重產 lock |
 
 ---
 
@@ -439,10 +324,12 @@ if not data.get("executor_can_start"):
 | 檔案 | 關係 |
 |------|------|
 | `references/strategist.md` v1 | Stage 1 schema 細節（10 Confirmations、17 欄位清單） |
-| `references/executor-base.md` v1 | Stage 2 Executor；吃本檔的 lock + spec |
-| `workflows/user-confirmation.md` v1 | **新增**；定義 confirmation loop 細節 |
+| **`workflows/phase-3-outliner.md` v1.0** | **Stage 1.5（v1.2 新拆分）**；吃本檔的 `0_strategist.md` 產 outline |
+| `workflows/user-confirmation.md` v1 | Stage 1.6 confirmation loop 細節 |
+| `references/executor-base.md` v1 | Stage 2 Executor；吃本檔的 lock + spec + Outliner 的 `0_outline.md` |
 | `workflows/topic-research.md` v1.1 | 上游；提供 sub-questions 給 Strategist 收斂 |
-| `scripts/strategist.py` | CLI 對應；產 blueprint + lock + spec |
+| `scripts/strategist.py` | CLI 對應；產 intent brief + lock + spec |
+| `scripts/outliner.py` | CLI 對應；產 `0_outline.md` + `0_outline_for_review.md` |
 | `scripts/report_lock.py` | `validate_lock()`；Strategist 必跑 |
 
 ---
@@ -452,8 +339,9 @@ if not data.get("executor_can_start"):
 | 版本 | 狀態 | 說明 |
 |------|------|------|
 | v1.0 | previous | 初版；10 Confirmations + Mermaid + 5 種範本 |
-| v1.1 | **current** | **新增 Section Blueprint**（Problem 1）+ **Confirmation Loop**（Problem 2） |
+| v1.1 | previous | **新增 Section Blueprint**（Problem 1）+ **Confirmation Loop**（Problem 2） |
+| v1.2 | **current** | **A1 重構**：拆出 `workflows/phase-3-outliner.md`（Stage 1.5）獨立負責章節藍圖；Strategist 收斂 intent brief（RQ1…RQn）後交棒 |
 
 ---
 
-*workflows/strategist.md v1.1 — 對應 SPEC.md v0.3 + SKILL.md v1.0 + references/strategist.md v1 + workflows/user-confirmation.md v1, 2026-06-13*
+*workflows/strategist.md v1.2 — 對應 SPEC.md v0.3 + SKILL.md v1.0 + references/strategist.md v1 + workflows/user-confirmation.md v1 + **workflows/phase-3-outliner.md v1.0**, 2026-06-13*
