@@ -1,0 +1,20 @@
+# Report-master Track A 依賴清單
+# 對應 SPEC.md §5.2 + Track A foundation
+#
+# 安裝：
+#   python3 -m venv .venv
+#   source .venv/bin/activate
+#   pip install -r scripts/requirements.txt
+#
+# 或一鍵：
+#   pip install -r scripts/requirements.txt pytest pymupdf mammoth python-docx
+
+# 必要（Track A 已用）
+python-dotenv>=1.0.0   # scripts/config.py 的 .env 載入鏈
+PyYAML>=6.0            # scripts/report_lock.py 的 YAML 解析
+PyMuPDF>=1.23.0        # scripts/source_to_md/pdf_to_md.py
+mammoth>=1.8.0         # scripts/source_to_md/docx_to_md.py
+requests>=2.31.0       # scripts/source_to_md/url_to_md.py
+
+# 測試
+pytest>=8.0.0          # tests/

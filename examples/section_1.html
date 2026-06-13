@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>第一章 緒論 — 範例報告</title>
+<style>
+body { font-family: '標楷體', 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; margin: 2.5cm; }
+h1 { font-family: '標楷體', 'Times New Roman', serif; font-size: 18pt; font-weight: bold; margin-top: 1em; }
+h2 { font-family: '標楷體', 'Times New Roman', serif; font-size: 16pt; font-weight: bold; margin-top: 0.8em; }
+h3 { font-family: '標楷體', 'Times New Roman', serif; font-size: 14pt; font-weight: bold; margin-top: 0.6em; }
+table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+th, td { border: 1px solid #999; padding: 0.5em; text-align: left; }
+th { background-color: #f0f0f0; font-weight: bold; }
+.caption { text-align: center; font-size: 10pt; margin-top: 0.3em; }
+a { color: #1a73e8; text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<h1>第一章 緒論</h1>
+
+<p>本文件為 <strong>Report-master</strong> 範例報告。本節展示一個符合 <code>docs/shared-standards.md</code> HTML/CSS 子集約束的單節 HTML，預期可順利通過 <code>quality_checker.py</code>、並由 <code>html_to_pdf.py</code> 與 <code>html_to_docx.py</code> 平行轉換為 PDF 與 DOCX。</p>
+
+<h2>1.1 研究背景</h2>
+
+<p>近年 AI 驅動的內容生成快速發展，從簡報 (ppt-master) 到本系統 (report-master) 皆試圖解決相同問題：<em>讓使用者從空白頁開始，用 90% 的 AI 協作消除報告寫作的啟動阻力</em>，產出結構完整、排版專業、可直接交付的報告書。</p>
+
+<p>參考 <a href="#ref1">[1]</a>、<a href="#ref2">[2]</a> 等文獻，本研究採用 <strong>HTML 作為中間格式</strong>，透過 weasyprint 與 pandoc 雙路徑產出 PDF 與 DOCX。</p>
+
+<h2>1.2 章節結構</h2>
+
+<p>本範例報告分為三章：</p>
+
+<ul>
+  <li>第一章 緒論（本文）</li>
+  <li>第二章 方法（略，請見 <code>section_2.html</code>）</li>
+  <li>第三章 結論（略，請見 <code>section_3.html</code>）</li>
+</ul>
+
+<h3>1.2.1 表格範例</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>項目</th>
+      <th>規格</th>
+      <th>備註</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>中文字體</td>
+      <td>標楷體</td>
+      <td>固定不可覆寫</td>
+    </tr>
+    <tr>
+      <td>英文字體</td>
+      <td>Times New Roman</td>
+      <td>固定不可覆寫</td>
+    </tr>
+    <tr>
+      <td>頁面大小</td>
+      <td>A4</td>
+      <td>21 × 29.7 cm</td>
+    </tr>
+    <tr>
+      <td>行距</td>
+      <td>1.5</td>
+      <td>APA 預設</td>
+    </tr>
+  </tbody>
+</table>
+
+<p class="caption">Table 1: 範例報告基本規格</p>
+
+<h3>1.2.2 註腳範例</h3>
+
+<p>註腳以 pandoc 原生 <code>^[...]</code> 語法寫入，但需注意 <code>pandoc HTML→DOCX</code> 不會自動解析 <code>&lt;sup&gt;&lt;a&gt;</code> 樣式，應採 Markdown 源 <code>^[note]</code>。^[這是註腳範例]</p>
+
+</body>
+</html>
