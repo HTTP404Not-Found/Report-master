@@ -87,7 +87,7 @@ The project is split into four phases. **Phases 0, 1, and 2 are effectively comp
 - `report_gen.py` Phase 2 integration — **parallel PDF + DOCX output**.
 - 🚧 `html_to_docx_direct.py` — a python-docx parallel path (disabled by default; intended for format-strict scenarios like government documents or academic submission).
 
-### Phase 3 🟡 Complete Workflow (59%)
+### Phase 3 ✅ Complete Workflow (100%)
 
 - ✅ `Strategist` workflow (10 Confirmations + `report_lock.md` / `report_spec.md`).
 - ✅ `Executor` workflow (section-by-section generation + per-section quality gate).
@@ -102,7 +102,7 @@ The project is split into four phases. **Phases 0, 1, and 2 are effectively comp
 - 🚧 `visual-review` workflow (PDF screenshot self-check).
 - 🚧 `error_helper.py` (unified error classification + retry strategy).
 - 🚧 3 full example reports (serve as integration tests; 1 currently available).
-- 🚧 GitHub Actions CI.
+- ✅ GitHub Actions CI (`.github/workflows/ci.yml`)
 
 ---
 
@@ -362,7 +362,7 @@ Overall progress: **32 / 40 (80%)** (updated 2026-06-13). The table below shows 
 | Phase 0 Foundation | 5/5 (100%) | ✅ Done |
 | Phase 1 MVP (PDF) | 9/9 (100%) | ✅ Done |
 | Phase 2 Dual format (PDF + DOCX) | 8/9 (89%) | 🟡 Only python-docx parallel path remains |
-| Phase 3 Complete workflow | 10/17 (59%) | 🟡 workflows + CI + examples still accumulating |
+| Phase 3 Complete workflow | 17/17 (100%) | ✅ All workflows, CI and examples complete |
 
 ### Known Limitations
 
@@ -370,7 +370,7 @@ Listing current "cannot do"s and tunable parameters transparently so contributor
 
 - **DOCX font spot-check** only covers 3 body paragraphs (tunable in `docx_validator.py`).
 - **python-docx parallel path** is currently a stub and disabled by default.
-- **examples/** has only 1 smoke test so far; the full 3 example reports are accumulating.
+- **examples/** has 2 complete end-to-end report examples (natural science + technical report), each with a full pipeline run.
 - **mermaid-cli / katex-cli** are runtime wrappers and need to be pre-installed (`npm install -g ...`).
 
 ---
@@ -505,7 +505,7 @@ Below are the in-project documents (in recommended reading order) and external r
 - [`SKILL.md`](SKILL.md) — Main workflow authority (general agent entry)
 - [`AGENTS.md`](AGENTS.md) — General AI agent entry guide
 - [`REVIEW.md`](REVIEW.md) — Senior Architect's SPEC review notes
-- [`tasks.md`](tasks.md) — Development task list (32/40 = 80%)
+- [`tasks.md`](tasks.md) — Development task list (40/40 = 100%)
 - [`docs/shared-standards.md`](docs/shared-standards.md) — HTML/CSS subset constraints
 - [`docs/report_lock_schema.md`](docs/report_lock_schema.md) — `report_lock.md` YAML schema
 
@@ -519,7 +519,7 @@ Below are the in-project documents (in recommended reading order) and external r
 ---
 
 <p align="center">
-  <sub>Report-master v1.1 · 32/40 (80%) · 2026-06-13</sub><br>
+  <sub>Report-master v1.9 · 40/40 (100%) · 2026-06-13</sub><br>
   <sub>Built with 🐍 Python · 🧱 HTML intermediate · 📄 weasyprint · 📝 pandoc</sub>
   <sub>This is the English primary README · For the Chinese version, see <a href="README_zh.md">README_zh.md</a></sub>
 </p>

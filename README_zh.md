@@ -87,7 +87,7 @@
 - `report_gen.py` Phase 2 整合 — **PDF + DOCX 平行產出**。
 - 🚧 `html_to_docx_direct.py` — python-docx 平行路徑(預設關閉,適合政府公文 / 學術投稿等格式極敏感場景)。
 
-### Phase 3 🟡 完整 Workflow / Complete Workflow (59%)
+### Phase 3 ✅ 完整 Workflow / Complete Workflow (100%)
 
 - ✅ `Strategist` workflow(10 Confirmations + `report_lock.md` / `report_spec.md`)
 - ✅ `Executor` workflow(逐節生成 + per-section quality gate)
@@ -504,7 +504,7 @@ SOFTWARE.
 - [`SKILL.md`](SKILL.md) — 主 workflow authority(general agent 入口)
 - [`AGENTS.md`](AGENTS.md) — general AI agent 入口指南
 - [`REVIEW.md`](REVIEW.md) — Senior Architect 的 SPEC 審稿紀錄
-- [`tasks.md`](tasks.md) — 開發任務清單(32/40 = 80%)
+- [`tasks.md`](tasks.md) — 開發任務清單(40/40 = 100%)
 - [`docs/shared-standards.md`](docs/shared-standards.md) — HTML/CSS 子集約束
 - [`docs/report_lock_schema.md`](docs/report_lock_schema.md) — `report_lock.md` YAML schema
 
@@ -518,7 +518,7 @@ SOFTWARE.
 ---
 
 <p align="center">
-  <sub>Report-master v1.1 · 32/40 (80%) · 2026-06-13</sub><br>
+  <sub>Report-master v1.9 · 40/40 (100%) · 2026-06-13</sub><br>
   <sub>Built with 🐍 Python · 🧱 HTML intermediate · 📄 weasyprint · 📝 pandoc</sub>
   <sub>本 README 為中文版 · 英文版請見 <a href="README.md">README.md</a></sub>
 </p>
