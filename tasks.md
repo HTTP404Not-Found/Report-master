@@ -11,8 +11,8 @@
 | Phase 0 基礎建設 | ✅ 5/5 (100%) | T0-4 不附字體檔，授權 metadata 完整 |
 | Phase 1 MVP（PDF） | ✅ 9/9 (100%) | 含整合 + 1 個 example |
 | Phase 2 雙格式（PDF + DOCX） | ✅ 8/9 (89%) | T2-2 build_template + reference.docx 完成；T2-3 python-docx stub 預設關閉 |
-| Phase 3 完整 Workflow | 🟡 12/17 (71%) | T3-1..T3-9 / T3-10 / T3-11 / T3-17 完成；剩 5 項（T3-12/T3-13/T3-14/T3-15/T3-16 + T2-3） |
-| **整體** | **34/40 (85%)** | M3 workflows 已啟動（Executor + topic-research） |
+| Phase 3 完整 Workflow | 🟡 14/17 (82%) | T3-1..T3-9 / T3-10 / T3-11 / T3-14 / T3-17 完成；剩 3 項（T3-13/T3-15/T3-16 + T2-3） |
+| **整體** | **36/40 (90%)** | M3 workflows 已啟動（Executor + topic-research） |
 
 ---
 
@@ -211,7 +211,7 @@
   - 預估：**M**
   - DoD：*改 §3.4.1 字體規則後，工具列出所有需同步的檔案。*
 
-- [ ] **T3-12 實作 `error_helper.py`（錯誤分類 + 重試策略）**
+- [x] **T3-12 實作 `error_helper.py`（錯誤分類 + 重試策略）**
   - 區分 transient / permanent；對 transient 自動重試 N 次；對 permanent 升級
   - 預估：**M**
   - DoD：*網路抖動自動重試成功；pandoc 缺欄位不重試直接 BLOCKING。*
@@ -221,7 +221,7 @@
   - 預估：**L**
   - DoD：*每個 example 跑完整 pipeline 成功；產出 PDF + DOCX；作為 integration test 進入 CI。*
 
-- [ ] **T3-14 撰寫 `docs/technical-design.md`（深化）**
+- [x] **T3-14 撰寫 `docs/technical-design.md`（深化）**
   - 對 architecture.md 的補充：失敗案例、效能數據、限制
   - 預估：**M**
   - DoD：*≥3 個失敗案例分析；≥1 份效能基準。*
