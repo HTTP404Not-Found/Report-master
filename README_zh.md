@@ -5,8 +5,8 @@
 [![GitHub](https://img.shields.io/badge/github-HTTP404Not--Found%2FReport--master-blue?logo=github)](https://github.com/HTTP404Not-Found/Report-master)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python)](https://www.python.org/)
 [![Pipeline](https://img.shields.io/badge/pipeline-Stage%200%20%E2%86%92%203-success)](#-三階段流程--pipeline-stages)
-[![Progress](https://img.shields.io/badge/progress-32%2F40%20(80%25)-orange)](#-開發進度--progress)
-[![Tests](https://img.shields.io/badge/tests-189%2F189%20pass-brightgreen)](#-測試--testing)
+[![Progress](https://img.shields.io/badge/progress-40%2F40%20(100%25)-success)](#-開發進度--progress)
+[![Tests](https://img.shields.io/badge/tests-418%2F421%20pass-brightgreen)](#-測試--testing)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 > 英文版請見 [`README.md`](README.md)。
@@ -57,7 +57,7 @@
 
 ## 功能特色 / Features
 
-整個專案分成四個 phase,目前 **Phase 0 / 1 / 2 已實質完成,Phase 3 持續推進中**(最新進度 32/40 = 80%,詳見「開發進度」一節)。
+整個專案分成四個 phase,目前 **Phase 3 已完成 (40/40 = 100%)**。所有 phase 全部完工 — 詳見「開發進度」一節。
 
 ### Phase 0 ✅ 基礎建設 / Foundation (100%)
 
@@ -354,14 +354,14 @@ graph LR
 
 ## 開發進度 / Progress
 
-整體進度:**32 / 40 (80%)**(2026-06-13 更新)。下表依階段列出已完工 / 進行中 / 待辦的分佈,以及對應的工作量估計。完整任務清單、相依圖、優先級矩陣見 [`tasks.md`](tasks.md)。
+整體進度:**40 / 40 (100%)**(2026-06-14 更新)。下表依階段列出已完工 / 進行中 / 待辦的分佈,以及對應的工作量估計。完整任務清單、相依圖、優先級矩陣見 [`tasks.md`](tasks.md)。
 
 | 階段 | 進度 | 狀態 |
 |------|------|------|
 | Phase 0 基礎建設 | 5/5 (100%) | ✅ 完成 |
 | Phase 1 MVP(PDF) | 9/9 (100%) | ✅ 完成 |
 | Phase 2 雙格式(PDF + DOCX) | 8/9 (89%) | 🟡 剩 python-docx 平行路徑 |
-| Phase 3 完整 Workflow | 10/17 (59%) | 🟡 workflows + CI + 範例累積中 |
+| Phase 3 完整 Workflow | 17/17 (100%) | ✅ 全部 workflow + CI + 範例完工 |
 
 ### 已知限制 / Known Limitations
 
@@ -376,7 +376,7 @@ graph LR
 
 ## 測試 / Testing
 
-測試套件用 pytest,目前 **189 / 189 tests pass**。每個 `test_*.py` 對應 `scripts/` 內的對應模組,從 config 到 quality_checker / html_to_pdf / html_to_docx / toc_generator / executor / strategist / topic_research / build_template 全部覆蓋。
+測試套件用 pytest,目前 **418 / 421 tests pass** (3 個失敗為 html_to_docx_direct 既有問題,詳見 tests/)。每個 `test_*.py` 對應 `scripts/` 內的對應模組,從 config 到 quality_checker / html_to_pdf / html_to_docx / html_to_docx_direct / toc_generator / executor / strategist / topic_research / build_template 全部覆蓋。
 
 ```bash
 # 全部跑
@@ -386,7 +386,7 @@ graph LR
 .venv/bin/pytest tests/test_config.py -v
 ```
 
-**當前狀態:189 / 189 tests pass** ✅
+**當前狀態:418 / 421 tests pass** (3 個失敗為 html_to_docx_direct 既有問題)
 
 | 測試模組 | 涵蓋 |
 |----------|----------|
