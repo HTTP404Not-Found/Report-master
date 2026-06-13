@@ -110,7 +110,7 @@
   - 預估：**L**
   - DoD：*1 份 HTML 輸入 → DOCX；DOCX 在 Word / LibreOffice 可開啟；引用與目次存在。*
 
-- [ ] **T2-2 (stub: templates/reference/README.md only, no build_template.py) 建立 `templates/reference/report-master-template.docx`（DOCX 模板）**
+- [x] **T2-2 (stub: templates/reference/README.md only, no build_template.py) 建立 `templates/reference/report-master-template.docx`（DOCX 模板）**
   - 預載 `Normal.dotm` 樣式：CJK=標楷體、Latin=Times New Roman；`Heading 1-3` 對應字級；封面 / 圖說 / 表格樣式齊備
   - 預估：**M**
   - DoD：*由 `templates/reference/build_template.py`（基於 python-docx）生成；手改文件受版本控管；T2-1 測試通過。*
@@ -156,7 +156,7 @@
 
 > 目標：把 Strategist / Executor 流程自動化、加入迭代迴圈、累積 examples 作為整合測試。
 
-- [ ] **T3-1 實作 `references/strategist.md` + Strategist workflow**
+- [x] **T3-1 實作 `references/strategist.md` + Strategist workflow**
   - 10 Confirmations 對話策略；產出 `report_lock.md` + `report_spec.md`；缺欄位 BLOCKING
   - 預估：**L**
   - DoD：*互動 10 個問題後能產出完整 lock；故意缺欄位時 BLOCKING。*
