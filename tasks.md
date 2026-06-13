@@ -11,8 +11,8 @@
 | Phase 0 基礎建設 | ✅ 5/5 (100%) | T0-4 不附字體檔，授權 metadata 完整 |
 | Phase 1 MVP（PDF） | ✅ 9/9 (100%) | 含整合 + 1 個 example |
 | Phase 2 雙格式（PDF + DOCX） | ✅ 8/9 (89%) | T2-2 build_template + reference.docx 完成；T2-3 python-docx stub 預設關閉 |
-| Phase 3 完整 Workflow | 🟡 10/17 (59%) | T3-1..T3-7 / T3-10 / T3-11 / T3-17 完成；剩 11 項（workflows + CI + 範例） |
-| **整體** | **32/40 (80%)** | M3 workflows 已啟動（Executor + topic-research） |
+| Phase 3 完整 Workflow | 🟡 12/17 (71%) | T3-1..T3-9 / T3-10 / T3-11 / T3-17 完成；剩 5 項（T3-12/T3-13/T3-14/T3-15/T3-16 + T2-3） |
+| **整體** | **34/40 (85%)** | M3 workflows 已啟動（Executor + topic-research） |
 
 ---
 
@@ -191,12 +191,12 @@
   - 預估：**S**
   - DoD：*改 HTML 檔後瀏覽器 1 秒內 reload；無需手動重啟。*
 
-- [ ] **T3-8 實作 `workflows/visual-review.md`（視覺自查 workflow）**
+- [x] **T3-8 實作 `workflows/visual-review.md`（視覺自查 workflow）**
   - 截圖比對、字體驗證、頁面佈局檢查
   - 預估：**M**
   - DoD：*PDF 截圖與 reference 範本比對差異 < 5% 像素。*
 
-- [ ] **T3-9 (delta_checker.py done, revise workflow pending) 實作 `Stage 2.5 revise` workflow + `delta_checker.py`**
+- [x] **T3-9 (delta_checker.py done, revise workflow pending) 實作 `Stage 2.5 revise` workflow + `delta_checker.py`**
   - 接收 section IDs；重生指定節；保留 `report_v{n}.html` 不覆蓋；產出 diff 報告
   - 預估：**L**
   - DoD：*v1 → 修第 2、4 節 → v2；v1/v2 兩檔並存；diff 報告列出章節級變更。*
