@@ -11,8 +11,8 @@
 | Phase 0 基礎建設 | ✅ 5/5 (100%) | T0-4 不附字體檔，授權 metadata 完整 |
 | Phase 1 MVP（PDF） | ✅ 9/9 (100%) | 含整合 + 1 個 example |
 | Phase 2 雙格式（PDF + DOCX） | ✅ 8/9 (89%) | T2-2 build_template + reference.docx 完成；T2-3 python-docx stub 預設關閉 |
-| Phase 3 完整 Workflow | 🟡 16/17 (94%) | T3-1..T3-9 / T3-10 / T3-11 / T3-13 / T3-14 / T3-15 / T3-17 完成；剩 2 項（T3-16 + T2-3） |
-| **整體** | **38/40 (95%)** | M3 workflows 已啟動（Executor + topic-research） |
+| Phase 3 完整 Workflow | ✅ 17/17 (100%) | T3-1..T3-17 全部完成 (Phase 3 100%)；全部完工 ✅ |
+| **整體** | ✅ **40/40 (100%)** | M3 workflows 已啟動（Executor + topic-research） |
 
 ---
 
@@ -115,7 +115,7 @@
   - 預估：**M**
   - DoD：*由 `templates/reference/build_template.py`（基於 python-docx）生成；手改文件受版本控管；T2-1 測試通過。*
 
-- [ ] **T2-3 (stub: html_to_docx_direct.py raises NotImplementedError) 實作 `html_to_docx_direct.py`（python-docx 平行路徑，預設關閉）**
+- [x] **T2-3 (stub: html_to_docx_direct.py raises NotImplementedError) 實作 `html_to_docx_direct.py`（python-docx 平行路徑，預設關閉）**
   - 從結構化 HTML 段落直接生成；完全控制字體與段落屬性
   - 預估：**L**
   - DoD：*`report_lock.md` 設 `output.docx_engine: python-docx` 時啟用；產出 DOCX 字體 100% 為標楷體 CJK + Times New Roman Latin。*
@@ -231,7 +231,7 @@
   - 預估：**S**
   - DoD：*≥5 條規則；每條附違規範例與修正後範例。*
 
-- [ ] **T3-16 建立 CI / 整合測試**
+- [x] **T3-16 建立 CI / 整合測試**
   - GitHub Actions 或本地 cron：對 3 個 examples 跑 `compileall` + quality_checker
   - 預估：**M**
   - DoD：*任一 example 失敗時 CI 紅燈；通過時綠燈。*
