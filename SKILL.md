@@ -50,13 +50,16 @@ description: Generate professional PDF + DOCX reports from Markdown / HTML sourc
 │   寫入 report_lock.md (YAML frontmatter + Markdown 註解)             │
 ├──────────────────────────────────────────────────────────────────────┤
 │ Stage 2 — AI 內容生成（Executor 逐節 HTML + quality gate）            │
+│   Executor = 逐節 + per-section quality gate（見 references/executor-base.md）
 │   對每一節：                                                          │
 │     重讀 report_lock.md (防 formatting drift)                        │
 │     重讀 glossary.md (防 narrative drift)                            │
+│     載入前節已生成 HTML（防內容重複、術語一致）                       │
 │     Executor 生成該節 HTML（內聯樣式優先）                            │
 │     quality_checker.py 過門（per-section gate）                       │
 │       → PASS: 寫入 report_output/section_N.html                      │
-│       → BLOCKING: 列出禁用清單命中項；重做                            │
+│       → BLOCKING: 列出禁用清單命中項；重做（最多 2 次）               │
+│     進度持久化到 lock.metadata.progress（auto-resume）               │
 ├──────────────────────────────────────────────────────────────────────┤
 │ Stage 2.5 — 迭代（可選，人類 review → v_n+1）                          │
 │   delta_checker.py 對 report_v_n vs v_n+1 做 section-level diff      │
@@ -181,11 +184,20 @@ python -m scripts.report_gen generate \
 **何時啟動**：Stage 2。
 
 **職責**：
-- 每節開工前重讀 `report_lock.md` + `glossary.md`
-- 依 `executor-base.md` 規則生成該節 HTML（內聯樣式優先）
-- 提交 `quality_checker` 過門；不通過則修正重提
+- 每節開工前重讀 `report_lock.md` + `glossary.md` + 前節 HTML（防 drift）
+- 依 `references/executor-base.md` 7-step 流程生成該節 HTML（內聯樣式優先）
+- 提交 `quality_checker` 過門；不通過則重生成（最多 2 次，仍 FAIL → 寫入 lock.metadata.errors）
+- 進度持久化到 `lock.metadata.progress`（支援 auto-resume / 斷點續傳）
+- Stage 3 由 `html_to_pdf.py` + `html_to_docx.py` 觸發（Executor 不直接執行）
 
-**不做**：不會改 `report_lock.md`、不會跑 Stage 3 轉換、不會跨節並行 sub-agent（敘事必漂移）。
+**不做**：不會改 lock 結構、不會跑 Stage 3 轉換、不會跨節並行 sub-agent（敘事必漂移）。
+
+**詳細 workflow**：見 `references/executor-base.md`（T3-2）。
+- 7-step 逐節流程（load → prompt → quality → write → next）
+- Mermaid 逐節生成流
+- 自動接續 `metadata.progress`（含 `--restart` / `--section N`）
+- CLI helper：`python -m scripts.executor --lock <path> --output <dir> [--section N]`
+- 與 Strategist / quality_checker / Stage 3 的邊界定義
 
 ---
 
@@ -259,7 +271,8 @@ python -m scripts.report_gen generate \
 |------|------|------|
 | v0.0 | done | placeholder |
 | v1.0 | **current** | Track B 完工：report_gen + quality_checker + html_to_* + validators + checkers + renderers + tests + examples |
-| v1.1 | planned | Stage 2.5 迭代 UI；mermaid/katex CLI 自動安裝 |
+| v1.1 | **current** | T3-1 Strategist workflow + T3-2 Executor workflow（逐節 + per-section quality gate） |
+| v1.2 | planned | Stage 2.5 迭代 UI；mermaid/katex CLI 自動安裝 |
 | v2.0 | TBD | Stage 4 / pipeline-as-service；multi-locale |
 
 ---
