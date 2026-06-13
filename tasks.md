@@ -11,8 +11,8 @@
 | Phase 0 基礎建設 | ✅ 5/5 (100%) | T0-4 不附字體檔，授權 metadata 完整 |
 | Phase 1 MVP（PDF） | ✅ 9/9 (100%) | 含整合 + 1 個 example |
 | Phase 2 雙格式（PDF + DOCX） | ✅ 8/9 (89%) | T2-2 build_template + reference.docx 完成；T2-3 python-docx stub 預設關閉 |
-| Phase 3 完整 Workflow | 🟡 4/17 (24%) | T3-1 / T3-10 / T3-11 / T3-17 完成；workflows + CI + 範例累積待做 |
-| **整體** | **26/40 (65%)** | M2 雙格式接近（差 python-docx 平行）；M3 待 Phase 3 補完 |
+| Phase 3 完整 Workflow | 🟡 8/17 (47%) | T3-1..T3-5 / T3-10 / T3-11 / T3-17 完成；剩 11 項（workflows + CI + 範例） |
+| **整體** | **30/40 (75%)** | M3 workflows 已啟動（Executor + topic-research） |
 
 ---
 
@@ -171,12 +171,12 @@
   - 預估：**M**
   - DoD：*輸入「AI 對教育影響」可產出 ≥3 個 URL 的彙整 Markdown。*
 
-- [ ] **T3-4 實作 `workflows/create-template.md`（範本建立 workflow）**
+- [x] **T3-4 實作 `workflows/create-template.md`（範本建立 workflow）**
   - 結構 / 格式 / 完整範本的建立步驟
   - 預估：**M**
   - DoD：*依此 workflow 可建立 1 個新 kind 的範本（如「公務提案」）。*
 
-- [ ] **T3-5 實作 `workflows/resume-execute.md`（斷點續傳 workflow）**
+- [x] **T3-5 實作 `workflows/resume-execute.md`（斷點續傳 workflow）**
   - 從 `report_lock.md` 讀進度；跳過已完成節
   - 預估：**M**
   - DoD：*中途 kill 後重啟，能從第 3 章續做；不重做已完成節。*
