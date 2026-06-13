@@ -291,51 +291,230 @@ def build_report_spec(
     return content
 
 
+# ─── 新流程：intent 模式（topic + audience → 0_strategist.md）────────
+
+# 章節藍圖的範本選擇啟發（依 topic 與 audience 推測 template）
+_TOPIC_TO_TEMPLATE_HINTS: List[Dict[str, Any]] = [
+    {
+        "match": ["影像", "醫學", "醫療", "clinical", "diagnosis", "deep learning"],
+        "template": "academic",
+        "sections": [
+            {"title": "緒論", "goal": "說明研究背景、動機與問題意識", "words": 1500},
+            {"title": "文獻回顧", "goal": "回顧 AI 醫學影像相關研究", "words": 1800},
+            {"title": "研究方法", "goal": "資料來源、模型架構、評估指標", "words": 1500},
+            {"title": "實驗結果", "goal": "呈現模型表現與統計分析", "words": 1800},
+            {"title": "討論與結論", "goal": "限制、未來工作、臨床意義", "words": 1400},
+        ],
+    },
+    {
+        "match": ["系統", "spec", "架構", "architecture", "api"],
+        "template": "spec",
+        "sections": [
+            {"title": "摘要", "goal": "系統目標與貢獻", "words": 800},
+            {"title": "背景與動機", "goal": "現有痛點與設計取捨", "words": 1200},
+            {"title": "相關工作", "goal": "同類系統比較", "words": 1200},
+            {"title": "系統設計", "goal": "架構、模組、API", "words": 1800},
+            {"title": "實作與實驗", "goal": "關鍵實作與量化結果", "words": 1500},
+            {"title": "結論與未來工作", "goal": "限制與後續規劃", "words": 800},
+        ],
+    },
+]
+
+
+def _guess_template_and_sections(topic: str, audience: str) -> Dict[str, Any]:
+    """依 topic 與 audience 推測 template 與章節藍圖（啟發式）。"""
+    topic_lower = (topic or "").lower()
+    audience_lower = (audience or "").lower()
+    for hint in _TOPIC_TO_TEMPLATE_HINTS:
+        for kw in hint["match"]:
+            if kw.lower() in topic_lower:
+                return {
+                    "template": hint["template"],
+                    "sections": list(hint["sections"]),
+                }
+    # 啟發失敗：依 audience 推
+    if "工程" in audience or "技術" in audience or "team" in audience_lower:
+        return {
+            "template": "spec",
+            "sections": [
+                {"title": "摘要", "goal": "系統目標與貢獻", "words": 800},
+                {"title": "背景", "goal": "領域現況", "words": 1200},
+                {"title": "系統設計", "goal": "架構與 API", "words": 1800},
+                {"title": "實作", "goal": "關鍵實作細節", "words": 1500},
+                {"title": "結論", "goal": "總結與後續工作", "words": 800},
+            ],
+        }
+    return {
+        "template": "academic",
+        "sections": [
+            {"title": "緒論", "goal": "研究背景與動機", "words": 1500},
+            {"title": "文獻回顧", "goal": "相關研究", "words": 1800},
+            {"title": "方法", "goal": "研究方法", "words": 1500},
+            {"title": "結果", "goal": "實驗結果", "words": 1800},
+            {"title": "結論", "goal": "結論與未來工作", "words": 1200},
+        ],
+    }
+
+
+def build_intent_brief(
+    topic: str,
+    audience: str,
+    *,
+    title: str = "",
+    constraints: Optional[List[str]] = None,
+) -> str:
+    """產出 0_strategist.md 的內容（Markdown 字串）。
+
+    這是 D1 新流程的「Strategist intent brief」：
+      - 收斂使用者口語需求為「報告意圖」
+      - 不直接產 lock（那是 Outliner 的工作）
+      - 給 Outliner 當輸入
+    """
+    guess = _guess_template_and_sections(topic, audience)
+    template = guess["template"]
+    sections = guess["sections"]
+    title_final = title.strip() or topic.strip()
+    constraints = constraints or []
+
+    sections_md = []
+    for i, sec in enumerate(sections, 1):
+        sections_md.append(f"{i}. **{sec['title']}**（{sec['words']} 字）")
+        sections_md.append(f"   - 目標：{sec['goal']}")
+        sections_md.append("")
+
+    constraints_md = "\n".join(f"- {c}" for c in constraints) if constraints else "- （無額外限制）"
+
+    body = f"""# 0_strategist.md — Strategist Intent Brief
+
+> 產生時間：{datetime.now().isoformat(timespec='seconds')}
+> 產出者：Strategist CLI（intent 模式，D1 新流程）
+> 對應 workflow：`workflows/strategist.md` v1.1（Section Blueprint 流程）
+
+## 1. 使用者意圖
+
+- **主題（topic）**：{topic}
+- **目標讀者（audience）**：{audience}
+- **預期標題**：{title_final}
+
+## 2. 推測的範本
+
+- **template**：`{template}`（依 topic / audience 啟發式推測，可由 Outliner 覆寫）
+
+## 3. 章節藍圖（Section Blueprint 草案）
+
+{chr(10).join(sections_md)}
+
+## 4. 限制與偏好
+
+{constraints_md}
+
+## 5. 給 Outliner 的交接資訊
+
+- 依上述章節藍圖展開為 `0_outline.md`（每章含核心問題、所需資料類型、預估字數）
+- 同時產出 `lock.md`（讓 Executor 可直接消費）
+- Audience 需在每章「目標」中明確提及
+- 若 topic 有歧義，Outliner 可微調章節數量（建議維持 5~6 章）
+
+---
+
+*0_strategist.md — 自動產生；下一步：Outliner*
+"""
+    return body
+
+
 # ─── CLI ─────────────────────────────────────────────────────────────
 
 def _cli() -> int:
+    # 不使用 argparse subparsers（避免「給 --list 時 subparser 互斥」的問題）
+    # 改為單一 parser 路由：
+    #   有 --topic / --audience → intent 模式
+    #   其他 → lock 模式（舊行為）
     parser = argparse.ArgumentParser(
         prog="report-master strategist",
-        description="Stage 1 Strategist CLI helper（10 Confirmations + lock 範本）",
+        description="Stage 1 Strategist CLI helper（10 Confirmations + lock 範本 + intent 模式）",
+    )
+    parser.add_argument(
+        "--topic", default=None,
+        help="intent 模式：報告主題（例：「AI在醫學影像診斷的應用」）",
+    )
+    parser.add_argument(
+        "--audience", default=None,
+        help="intent 模式：目標讀者（例：「醫學研究人員」）",
+    )
+    parser.add_argument(
+        "--constraint", action="append", default=[],
+        help="intent 模式：額外限制（可重複）",
     )
     parser.add_argument(
         "--template", "-t",
         choices=SUPPORTED_TEMPLATES,
         default="academic",
-        help="範本類型（預設 academic）",
+        help="lock 模式：範本類型（預設 academic）",
     )
     parser.add_argument(
         "--output", "-o",
         type=Path,
         default=None,
-        help="輸出 lock 檔路徑（省略則印到 stdout）",
+        help="lock 模式：輸出 lock 檔路徑 / intent 模式：輸出目錄",
     )
     parser.add_argument(
         "--spec-output", "-s",
         type=Path,
         default=None,
-        help="額外輸出 report_spec.md 檔路徑",
+        help="lock 模式：額外輸出 report_spec.md 檔路徑",
     )
     parser.add_argument(
         "--title",
         default="",
-        help="報告標題（覆寫 metadata.title）",
+        help="lock 模式：報告標題 / intent 模式：報告標題（省略則用 topic）",
     )
     parser.add_argument(
         "--validate", "-V",
         type=Path,
         default=None,
-        help="驗證現有 lock 檔（與 --template 互斥）",
+        help="lock 模式：驗證現有 lock 檔（與 --template 互斥）",
     )
     parser.add_argument(
         "--list", "-l",
         action="store_true",
-        help="列出支援的範本與 10 Confirmations 問題",
+        help="lock 模式：列出支援的範本與 10 Confirmations 問題",
     )
-
     args = parser.parse_args()
 
-    if args.list:
+    # 路由：intent vs lock
+    if args.topic is not None or args.audience is not None:
+        # intent 模式：需要 topic + audience + output
+        if args.topic is None or args.audience is None:
+            print("[BLOCKING] intent 模式需要 --topic 與 --audience", file=sys.stderr)
+            return 2
+        if args.output is None:
+            print("[BLOCKING] intent 模式需要 --output（輸出目錄）", file=sys.stderr)
+            return 2
+        return _cli_intent(args)
+    return _cli_lock(args)
+
+
+def _cli_intent(args: argparse.Namespace) -> int:
+    """intent 子命令：寫出 0_strategist.md。"""
+    output_dir: Path = args.output
+    output_dir.mkdir(parents=True, exist_ok=True)
+    target = output_dir / "0_strategist.md"
+    content = build_intent_brief(
+        topic=args.topic,
+        audience=args.audience,
+        title=getattr(args, "title", "") or "",
+        constraints=getattr(args, "constraint", []) or [],
+    )
+    target.write_text(content, encoding="utf-8")
+    print(f"✅ intent brief 已寫入：{target}")
+    print(f"   topic    : {args.topic}")
+    print(f"   audience : {args.audience}")
+    return 0
+
+
+def _cli_lock(args: argparse.Namespace) -> int:
+    """lock 子命令：舊版行為。"""
+    if getattr(args, "list", False):
         print("=== 支援的範本 ===")
         for t in SUPPORTED_TEMPLATES:
             mark = "✅" if t in COMPLETED_TEMPLATES else "🚧"

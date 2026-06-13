@@ -33,11 +33,13 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import shutil
 import sys
 import time
 import traceback
 from dataclasses import dataclass, field, asdict
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -411,6 +413,361 @@ def run_one_example(
     return result
 
 
+# ─── D1 新增：E2E 函式（含 outline + confirmed.json + research asserts）─
+
+# D1 topics（依 example 設計）
+EXAMPLE_1_D1_TOPICS = ["AI醫學影像", "深度學習醫療", "CNN醫學診斷"]
+EXAMPLE_2_D1_TOPICS = ["Spec-Lock 設計哲學", "OpenReport 系統架構", "報告生成 pipeline"]
+
+
+def _assert_d1_artifacts(
+    example: Dict[str, Any],
+    output_dir: Path,
+    *,
+    require_research_count: int = 1,
+) -> List[str]:
+    """檢查 D1 新增 artifacts（outline + confirmed.json + research + docx 無 ** 殘留）。
+
+    Returns:
+        error list（空 list = 全部通過）
+    """
+    errors: List[str] = []
+
+    # 0_strategist.md
+    strategist = output_dir / "0_strategist.md"
+    if not strategist.exists():
+        errors.append(f"[D1] 缺 0_strategist.md：{strategist}")
+    else:
+        s_content = strategist.read_text(encoding="utf-8")
+        if "主題" not in s_content and "topic" not in s_content.lower():
+            errors.append(f"[D1] 0_strategist.md 缺 topic/主題欄位")
+
+    # 0_outline.md
+    outline = output_dir / "0_outline.md"
+    if not outline.exists():
+        errors.append(f"[D1] 缺 0_outline.md：{outline}")
+    else:
+        o_content = outline.read_text(encoding="utf-8")
+        if "Section Blueprint" not in o_content and "章節" not in o_content:
+            errors.append(f"[D1] 0_outline.md 缺 Section Blueprint / 章節內容")
+
+    # 0_confirmed.json
+    confirmed = output_dir / "0_confirmed.json"
+    if not confirmed.exists():
+        errors.append(f"[D1] 缺 0_confirmed.json：{confirmed}")
+    else:
+        try:
+            c_data = json.loads(confirmed.read_text(encoding="utf-8"))
+            if c_data.get("confirmed") is not True:
+                errors.append(
+                    f"[D1] 0_confirmed.json 應 confirmed=true，實際：{c_data}"
+                )
+        except json.JSONDecodeError as e:
+            errors.append(f"[D1] 0_confirmed.json JSON 解析失敗：{e}")
+
+    # chapter_*_research.md
+    research_files = sorted(output_dir.glob("chapter_*_research.md"))
+    if len(research_files) < require_research_count:
+        errors.append(
+            f"[D1] 應有 ≥{require_research_count} 個 chapter_*_research.md，"
+            f"實際：{len(research_files)}"
+        )
+
+    # report_final.docx 存在 + > 5KB + 無 ** 殘留
+    docx = output_dir / "report_final.docx"
+    if not docx.exists():
+        errors.append(f"[D1] 缺 report_final.docx：{docx}")
+    else:
+        size = docx.stat().st_size
+        if size <= 5 * 1024:
+            errors.append(f"[D1] report_final.docx 應 > 5KB，實際 {size} bytes")
+        # 讀 DOCX 內容並查 ** 殘留
+        try:
+            from docx import Document
+            import re as _re
+            text = "\n".join(p.text for p in Document(str(docx)).paragraphs)
+            if _re.search(r"\*\*", text):
+                errors.append(
+                    f"[D1] report_final.docx 內文有 ** 殘留；"
+                    f"前 200 字：{text[:200]!r}"
+                )
+        except ImportError:
+            # python-docx 未安裝 → 跳過內容檢查
+            pass
+
+    return errors
+
+
+def test_example_1_e2e() -> ExampleResult:
+    """D1 E2E：example_1 跑 7-step pipeline + 驗收所有 artifacts。
+
+    Returns:
+        ExampleResult（passed=True 表示全部 assert 過）
+    """
+    t0 = time.time()
+    result = ExampleResult(
+        example_id=1,
+        name=EXAMPLE_1["name"],
+        passed=False,
+        output_dir="",
+    )
+    output_dir = EXAMPLES_DIR / "output_1"
+    result.output_dir = str(output_dir)
+
+    try:
+        # 燒毀舊 output
+        burn_output(output_dir)
+
+        # Step 1: Strategist（intent 模式）
+        import subprocess
+        env = {**os.environ, "PYTHONPATH": str(PROJECT_ROOT)}
+        r = subprocess.run(
+            [
+                sys.executable, "-m", "scripts.strategist",
+                "--topic", "AI在醫學影像診斷的應用",
+                "--audience", "醫學研究人員",
+                "--output", str(output_dir),
+            ],
+            cwd=str(PROJECT_ROOT), env=env, capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            result.errors.append(f"[Step 1 strategist] 失敗：{r.stderr}")
+            return result
+
+        # Step 2: Outliner
+        r = subprocess.run(
+            [
+                sys.executable, "-m", "scripts.outliner",
+                "--strategist", str(output_dir / "0_strategist.md"),
+                "--output", str(output_dir / "0_outline.md"),
+            ],
+            cwd=str(PROJECT_ROOT), env=env, capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            result.errors.append(f"[Step 2 outliner] 失敗：{r.stderr}")
+            return result
+
+        # Step 3: 模擬用戶確認
+        confirmed_payload = {
+            "confirmed": True,
+            "user_notes": "smoke test OK",
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "executor_can_start": True,
+        }
+        (output_dir / "0_confirmed.json").write_text(
+            json.dumps(confirmed_payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+        # Step 4: Web Research（chapter-mode）
+        r = subprocess.run(
+            [
+                sys.executable, "-m", "scripts.web_research",
+                "--topics", ",".join(EXAMPLE_1_D1_TOPICS),
+                "--output", str(output_dir),
+            ],
+            cwd=str(PROJECT_ROOT), env=env, capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            result.errors.append(f"[Step 4 web_research] 失敗：{r.stderr}")
+            return result
+
+        # Step 5: Executor（chapter 1）
+        r = subprocess.run(
+            [
+                sys.executable, "-m", "scripts.executor",
+                "--outline", str(output_dir / "0_outline.md"),
+                "--report-output", str(output_dir),
+                "--chapters", "1",
+            ],
+            cwd=str(PROJECT_ROOT), env=env, capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            result.errors.append(f"[Step 5 executor] 失敗：{r.stderr}")
+            return result
+
+        # Step 6: Bundle
+        r = subprocess.run(
+            [
+                sys.executable, "-m", "scripts.bundle",
+                "--input", str(output_dir),
+                "--output", str(output_dir / "report_final.html"),
+            ],
+            cwd=str(PROJECT_ROOT), env=env, capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            result.errors.append(f"[Step 6 bundle] 失敗：{r.stderr}")
+            return result
+
+        # Step 7: HTML → DOCX
+        r = subprocess.run(
+            [
+                sys.executable, "-m", "scripts.html_to_docx_direct",
+                "--input", str(output_dir / "report_final.html"),
+                "--output", str(output_dir / "report_final.docx"),
+            ],
+            cwd=str(PROJECT_ROOT), env=env, capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            result.errors.append(f"[Step 7 html_to_docx] 失敗：{r.stderr}")
+            return result
+
+        # D1 驗收清單
+        d1_errors = _assert_d1_artifacts(EXAMPLE_1, output_dir)
+        if d1_errors:
+            result.errors.extend(d1_errors)
+            return result
+
+        # 全綠
+        docx_size = (output_dir / "report_final.docx").stat().st_size
+        result.docx_size = docx_size
+        result.html_size = (output_dir / "report_final.html").stat().st_size
+        result.passed = True
+        result.notes.append(
+            f"✅ D1 7-step pipeline 全部過關；"
+            f"report_final.docx={docx_size} bytes"
+        )
+
+    except Exception as e:
+        result.errors.append(f"[D1] 未預期例外：{e}")
+        logger.error("traceback: %s", traceback.format_exc())
+    finally:
+        result.duration_sec = round(time.time() - t0, 2)
+    return result
+
+
+def test_example_2_e2e() -> ExampleResult:
+    """D1 E2E：example_2 跑 7-step pipeline + 驗收所有 artifacts。"""
+    t0 = time.time()
+    result = ExampleResult(
+        example_id=2,
+        name=EXAMPLE_2["name"],
+        passed=False,
+        output_dir="",
+    )
+    output_dir = EXAMPLES_DIR / "output_2"
+    result.output_dir = str(output_dir)
+
+    try:
+        burn_output(output_dir)
+
+        import subprocess
+        env = {**os.environ, "PYTHONPATH": str(PROJECT_ROOT)}
+
+        # Step 1
+        r = subprocess.run(
+            [
+                sys.executable, "-m", "scripts.strategist",
+                "--topic", "OpenReport：基於 Spec-Lock 的報告生成系統",
+                "--audience", "工程團隊與技術長",
+                "--output", str(output_dir),
+            ],
+            cwd=str(PROJECT_ROOT), env=env, capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            result.errors.append(f"[Step 1 strategist] 失敗：{r.stderr}")
+            return result
+
+        # Step 2
+        r = subprocess.run(
+            [
+                sys.executable, "-m", "scripts.outliner",
+                "--strategist", str(output_dir / "0_strategist.md"),
+                "--output", str(output_dir / "0_outline.md"),
+            ],
+            cwd=str(PROJECT_ROOT), env=env, capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            result.errors.append(f"[Step 2 outliner] 失敗：{r.stderr}")
+            return result
+
+        # Step 3
+        confirmed_payload = {
+            "confirmed": True,
+            "user_notes": "smoke test OK",
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "executor_can_start": True,
+        }
+        (output_dir / "0_confirmed.json").write_text(
+            json.dumps(confirmed_payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+        # Step 4
+        r = subprocess.run(
+            [
+                sys.executable, "-m", "scripts.web_research",
+                "--topics", ",".join(EXAMPLE_2_D1_TOPICS),
+                "--output", str(output_dir),
+            ],
+            cwd=str(PROJECT_ROOT), env=env, capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            result.errors.append(f"[Step 4 web_research] 失敗：{r.stderr}")
+            return result
+
+        # Step 5
+        r = subprocess.run(
+            [
+                sys.executable, "-m", "scripts.executor",
+                "--outline", str(output_dir / "0_outline.md"),
+                "--report-output", str(output_dir),
+                "--chapters", "1",
+            ],
+            cwd=str(PROJECT_ROOT), env=env, capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            result.errors.append(f"[Step 5 executor] 失敗：{r.stderr}")
+            return result
+
+        # Step 6
+        r = subprocess.run(
+            [
+                sys.executable, "-m", "scripts.bundle",
+                "--input", str(output_dir),
+                "--output", str(output_dir / "report_final.html"),
+            ],
+            cwd=str(PROJECT_ROOT), env=env, capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            result.errors.append(f"[Step 6 bundle] 失敗：{r.stderr}")
+            return result
+
+        # Step 7
+        r = subprocess.run(
+            [
+                sys.executable, "-m", "scripts.html_to_docx_direct",
+                "--input", str(output_dir / "report_final.html"),
+                "--output", str(output_dir / "report_final.docx"),
+            ],
+            cwd=str(PROJECT_ROOT), env=env, capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            result.errors.append(f"[Step 7 html_to_docx] 失敗：{r.stderr}")
+            return result
+
+        d1_errors = _assert_d1_artifacts(EXAMPLE_2, output_dir)
+        if d1_errors:
+            result.errors.extend(d1_errors)
+            return result
+
+        docx_size = (output_dir / "report_final.docx").stat().st_size
+        result.docx_size = docx_size
+        result.html_size = (output_dir / "report_final.html").stat().st_size
+        result.passed = True
+        result.notes.append(
+            f"✅ D1 7-step pipeline 全部過關；"
+            f"report_final.docx={docx_size} bytes"
+        )
+
+    except Exception as e:
+        result.errors.append(f"[D1] 未預期例外：{e}")
+        logger.error("traceback: %s", traceback.format_exc())
+    finally:
+        result.duration_sec = round(time.time() - t0, 2)
+    return result
+
+
 # ─── CLI ────────────────────────────────────────────────────────────
 
 def _cli() -> int:
@@ -431,6 +788,10 @@ def _cli() -> int:
         help="跳過 Stage 3 PDF/DOCX 渲染（只要 HTML）",
     )
     parser.add_argument(
+        "--d1", action="store_true",
+        help="D1 新流程：跑 Strategist(intent)→Outliner→Confirm→Research→Executor→Bundle→DOCX（驗收 outline+confirmed.json+research）",
+    )
+    parser.add_argument(
         "--json", action="store_true",
         help="以 JSON 格式輸出結果",
     )
@@ -440,6 +801,33 @@ def _cli() -> int:
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
+
+    # D1 新流程分支
+    if args.d1:
+        which_d1: List[ExampleResult] = []
+        if args.only == 1 or args.only is None:
+            print(f"\n{'='*70}")
+            print(f"🧪 D1 example_1 E2E（Strategist→Outliner→Confirm→Research→Executor→Bundle→DOCX）")
+            print(f"{'='*70}")
+            r1 = test_example_1_e2e()
+            which_d1.append(r1)
+        if args.only == 2 or args.only is None:
+            print(f"\n{'='*70}")
+            print(f"🧪 D1 example_2 E2E")
+            print(f"{'='*70}")
+            r2 = test_example_2_e2e()
+            which_d1.append(r2)
+
+        all_pass = all(r.passed for r in which_d1)
+        for r in which_d1:
+            print(f"  example_{r.example_id}: passed={r.passed}, "
+                  f"docx={r.docx_size} bytes, html={r.html_size} bytes, "
+                  f"duration={r.duration_sec}s")
+            for note in r.notes:
+                print(f"    note: {note}")
+            for err in r.errors:
+                print(f"    ERR : {err}")
+        return 0 if all_pass else 1
 
     which: List[Dict[str, Any]] = []
     if args.only == 1 or args.only is None:

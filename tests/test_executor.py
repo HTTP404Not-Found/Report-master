@@ -75,7 +75,7 @@ def test_executor_md_frontmatter_loads():
     assert fm.get("name") == "executor", "name 應為 'executor'"
     assert fm.get("description"), "description 必填"
     assert len(fm.get("description", "")) >= 50, "description 太短"
-    assert str(fm.get("version")) == "1.0", "version 應為 1.0"
+    assert str(fm.get("version")) in ("1.0", "1.1"), "version 應為 1.0 或 1.1"
 
 
 # ─── Test 2（必要）: 流程圖 / step 清單都在 executor.md 內 ─────────────

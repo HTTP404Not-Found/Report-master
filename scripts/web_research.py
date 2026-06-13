@@ -459,23 +459,86 @@ def run_web_research(
     return expansion
 
 
+# ─── D1 新流程：chapter-mode（為多章研究）──────────────────────────────
+
+def run_chapter_research(
+    topics: List[str],
+    output_dir: Path,
+    *,
+    backend: Optional[BaseSearchBackend] = None,
+    max_results: int = 5,
+    max_bullets: int = 5,
+    min_bullets: int = 3,
+    verbose: bool = True,
+) -> List[ContentExpansion]:
+    """D1 新流程：給多個 topic，為每個 topic 產一份 `chapter_N_research.md`。
+
+    Args:
+        topics: 每一個 topic 會變成 `chapter_{N}_research.md`（N 從 1 開始）
+        output_dir: 輸出根目錄
+        其餘: 同 run_web_research
+
+    Returns:
+        跑成功的 ContentExpansion list
+    """
+    if not topics:
+        raise WebResearchError("topics 不可為空")
+    if backend is None:
+        backend = make_search_backend(search_fn=None, prefer_real=False)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    expansions: List[ContentExpansion] = []
+    for idx, topic in enumerate(topics, 1):
+        topic = topic.strip()
+        if not topic:
+            continue
+        expansion = ContentExpansion(query=topic, backend=backend.name)
+        if verbose:
+            print(f"🌐 [chapter {idx}] research for「{topic}」")
+        try:
+            expansion.hits = backend.search(topic, max_results=max_results)
+        except WebSearchError as e:
+            print(f"   [WARN] chapter {idx} search 失敗：{e}", file=sys.stderr)
+            expansion.hits = []
+        expansion.bullets = _default_bullet_formatter(
+            expansion.hits, topic, max_bullets=max_bullets
+        )
+        # 嘗試驗證（不 raise，避免 block 整個 pipeline）
+        try:
+            expansion.validate(min_bullets=1)  # 寬鬆：只要有 bullet 即可
+        except ContentExpansionError:
+            pass
+        # 寫入 chapter_N_research.md
+        out_path = output_dir / f"chapter_{idx}_research.md"
+        out_path.write_text(expansion.to_markdown(), encoding="utf-8")
+        if verbose:
+            print(f"   ✅ {out_path.name}（{len(expansion.hits)} hits, {len(expansion.bullets)} bullets）")
+        expansions.append(expansion)
+    return expansions
+
+
 # ─── CLI ─────────────────────────────────────────────────────────────
 
 def _cli() -> int:
     parser = argparse.ArgumentParser(
         prog="report-master web-research",
-        description="Stage 0.x content expansion：給 query，產 content_expansion/{slug}.md",
+        description="Stage 0.x content expansion：給 query，產 content_expansion/{slug}.md（D1 新流程也可走 --topics）",
     )
     parser.add_argument(
         "--query", "-q",
-        required=True,
-        help="research query 字串（必填）",
+        default=None,
+        help="research query 字串（必填；舊行為）",
+    )
+    parser.add_argument(
+        "--topics",
+        default=None,
+        help="D1 新流程：多個 topic（comma-separated），會產 chapter_N_research.md",
     )
     parser.add_argument(
         "--output", "-o",
         type=Path,
         default=Path("report_output"),
-        help="輸出根目錄（預設 ./report_output/，會建立 ./report_output/content_expansion/）",
+        help="輸出根目錄（預設 ./report_output/）",
     )
     parser.add_argument(
         "--max-results",
@@ -507,6 +570,38 @@ def _cli() -> int:
     )
 
     args = parser.parse_args()
+
+    # D1 新流程：--topics（chapter-mode）
+    if args.topics is not None:
+        topic_list = [t.strip() for t in args.topics.split(",") if t.strip()]
+        if not topic_list:
+            print("[BLOCKING] --topics 解析後為空", file=sys.stderr)
+            return 2
+        try:
+            backend = None
+            if args.prefer_real:
+                try:
+                    backend = make_search_backend(prefer_real=True)
+                except WebSearchError as e:
+                    print(f"[WebSearchError] {e}", file=sys.stderr)
+                    return 1
+            run_chapter_research(
+                topics=topic_list,
+                output_dir=args.output,
+                backend=backend,
+                max_results=args.max_results,
+                max_bullets=args.max_bullets,
+                min_bullets=args.min_bullets,
+                verbose=not args.quiet,
+            )
+        except WebResearchError as e:
+            print(f"[WebResearchError] {e}", file=sys.stderr)
+            return 1
+        return 0
+
+    # 舊行為：--query
+    if args.query is None:
+        parser.error("需要 --query 或 --topics")
 
     try:
         # 若 prefer_real，預先建好 backend（讓 error 更早 fail-fast）

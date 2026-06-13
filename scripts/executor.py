@@ -539,20 +539,32 @@ def _cli() -> int:
     parser.add_argument(
         "--lock", "-l",
         type=Path,
-        required=True,
-        help="report_lock.md 路徑",
+        default=None,
+        help="report_lock.md 路徑（D1 新流程：lock 與 outline 二選一）",
+    )
+    parser.add_argument(
+        "--outline", type=Path, default=None,
+        help="D1 新流程：0_outline.md 路徑（會自動解同目錄的 lock.md）",
     )
     parser.add_argument(
         "--output", "-o",
         type=Path,
-        default=Path("report_output"),
-        help="section HTML 輸出目錄（預設 report_output/）",
+        default=None,
+        help="section HTML 輸出目錄（預設與 lock 同目錄）",
+    )
+    parser.add_argument(
+        "--report-output", type=Path, default=None,
+        help="D1 新流程：別名給 --output（為 task 規格 --report-output 一致）",
     )
     parser.add_argument(
         "--section", "-s",
         type=str,
         default=None,
         help="只跑指定節（1-based；可 comma-separated 跑多節）",
+    )
+    parser.add_argument(
+        "--chapters", type=str, default=None,
+        help="D1 新流程：同 --section（task 規格同義詞）",
     )
     parser.add_argument(
         "--spec",
@@ -594,10 +606,29 @@ def _cli() -> int:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
+    # 解析 lock 路徑：--outline 優先
+    if args.outline is not None:
+        outline_path: Path = args.outline
+        # 自動解同目錄的 lock.md
+        candidate_lock = outline_path.parent / "lock.md"
+        if not candidate_lock.exists():
+            print(f"❌ --outline 指定但同目錄缺 lock.md：{candidate_lock}", file=sys.stderr)
+            return 1
+        lock_path = candidate_lock
+    elif args.lock is not None:
+        lock_path = args.lock
+    else:
+        parser.error("需要 --lock 或 --outline")
+
+    # 解析 output 目錄
+    output_dir: Path = args.report_output or args.output
+    if output_dir is None:
+        output_dir = lock_path.parent
+
     try:
         exe = Executor(
-            lock_path=args.lock,
-            output_dir=args.output,
+            lock_path=lock_path,
+            output_dir=output_dir,
             spec_path=args.spec,
             glossary_path=args.glossary,
             max_retries=args.max_retries,
@@ -610,10 +641,11 @@ def _cli() -> int:
         print(f"❌ {e}", file=sys.stderr)
         return 1
 
-    # 跑單節 vs 跑全部
-    if args.section:
+    # 解析 section 參數：--chapters 或 --section
+    section_arg = args.chapters or args.section
+    if section_arg:
         try:
-            indices = _parse_sections(args.section, len(exe.lock_data.get("sections", [])))
+            indices = _parse_sections(section_arg, len(exe.lock_data.get("sections", [])))
         except ValueError as e:
             print(f"❌ {e}", file=sys.stderr)
             return 1
@@ -632,8 +664,8 @@ def _cli() -> int:
         # 寫入 progress
         exe._write_progress(ExecutorResult(
             passed=all_ok,
-            lock_path=str(args.lock),
-            output_dir=str(args.output),
+            lock_path=str(lock_path),
+            output_dir=str(output_dir),
             total_sections=len(exe.lock_data.get("sections", [])),
             completed_sections=[r.section_index for r in results],
             timestamp=datetime.now().isoformat(timespec="seconds"),

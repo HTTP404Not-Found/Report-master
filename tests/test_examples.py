@@ -26,6 +26,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -349,3 +350,120 @@ def test_example_mds_no_chapter_prefix_duplication():
             assert doubled not in content, (
                 f"{md.name} 內含重複章節前綴 {doubled!r}"
             )
+
+
+# ─── D1 新增 tests（tasks.md D1 — End-to-End Smoke × 2）───────────
+
+def _read_docx_text(path: Path) -> str:
+    """讀 DOCX 並回傳 plain text。"""
+    try:
+        from docx import Document
+    except ImportError:
+        return ""
+    doc = Document(str(path))
+    return "\n".join(p.text for p in doc.paragraphs)
+
+
+def _has_asterisk_residue(text: str) -> bool:
+    """檢查 text 內是否有遊離的 ** 殘留。"""
+    import re as _re
+    return bool(_re.search(r"\*\*", text))
+
+
+def test_example_1_d1_artifacts_complete():
+    """D1：example_1 應有完整 artifacts：0_strategist.md / 0_outline.md /
+    0_confirmed.json / chapter_*_research.md / report_final.docx（無 ** 殘留）。"""
+    output_1 = EXAMPLES_DIR / "output_1"
+    if not output_1.exists():
+        pytest.skip(f"{output_1} 不存在；請先跑 D1 smoke。")
+
+    # 1. 0_strategist.md
+    strategist = output_1 / "0_strategist.md"
+    assert strategist.exists(), f"缺少 {strategist}"
+    s_content = strategist.read_text(encoding="utf-8")
+    assert "主題" in s_content or "topic" in s_content.lower(), (
+        "0_strategist.md 應含 topic/主題欄位"
+    )
+
+    # 2. 0_outline.md
+    outline = output_1 / "0_outline.md"
+    assert outline.exists(), f"缺少 {outline}"
+    o_content = outline.read_text(encoding="utf-8")
+    assert "Section Blueprint" in o_content or "章節" in o_content, (
+        "0_outline.md 應含 Section Blueprint / 章節內容"
+    )
+
+    # 3. 0_confirmed.json（含 confirmed: true）
+    confirmed = output_1 / "0_confirmed.json"
+    assert confirmed.exists(), f"缺少 {confirmed}"
+    c_data = json.loads(confirmed.read_text(encoding="utf-8"))
+    assert c_data.get("confirmed") is True, (
+        f"0_confirmed.json 應有 confirmed=true，實際：{c_data}"
+    )
+
+    # 4. chapter_*_research.md（至少 1 個）
+    research_files = sorted(output_1.glob("chapter_*_research.md"))
+    assert len(research_files) >= 1, (
+        f"應有 ≥1 個 chapter_*_research.md，實際：{list(output_1.glob('chapter_*_research.md'))}"
+    )
+    # 第一個 research 應有 bullets
+    first_research = research_files[0].read_text(encoding="utf-8")
+    assert "Bullets" in first_research or "bullet" in first_research.lower(), (
+        f"chapter_1_research.md 應含 Bullets 區段"
+    )
+
+    # 5. report_final.docx（> 5KB + 無 ** 殘留）
+    docx = output_1 / "report_final.docx"
+    assert docx.exists(), f"缺少 {docx}"
+    assert docx.stat().st_size > 5 * 1024, (
+        f"report_final.docx 應 > 5KB，實際 {docx.stat().st_size} bytes"
+    )
+    text = _read_docx_text(docx)
+    assert not _has_asterisk_residue(text), (
+        f"report_final.docx 內文不應有 ** 殘留；抽樣：{text[:200]!r}"
+    )
+
+
+def test_example_2_d1_artifacts_complete():
+    """D1：example_2 應有完整 artifacts（同 example_1）。"""
+    output_2 = EXAMPLES_DIR / "output_2"
+    if not output_2.exists():
+        pytest.skip(f"{output_2} 不存在；請先跑 D1 smoke。")
+
+    strategist = output_2 / "0_strategist.md"
+    assert strategist.exists(), f"缺少 {strategist}"
+
+    outline = output_2 / "0_outline.md"
+    assert outline.exists(), f"缺少 {outline}"
+
+    confirmed = output_2 / "0_confirmed.json"
+    assert confirmed.exists(), f"缺少 {confirmed}"
+    c_data = json.loads(confirmed.read_text(encoding="utf-8"))
+    assert c_data.get("confirmed") is True, (
+        f"0_confirmed.json 應有 confirmed=true，實際：{c_data}"
+    )
+
+    research_files = sorted(output_2.glob("chapter_*_research.md"))
+    assert len(research_files) >= 1, (
+        f"應有 ≥1 個 chapter_*_research.md，實際：{list(output_2.glob('chapter_*_research.md'))}"
+    )
+
+    docx = output_2 / "report_final.docx"
+    assert docx.exists(), f"缺少 {docx}"
+    assert docx.stat().st_size > 5 * 1024
+    text = _read_docx_text(docx)
+    assert not _has_asterisk_residue(text), (
+        f"report_final.docx 內文不應有 ** 殘留"
+    )
+
+
+def test_d1_no_asterisk_residue_either_example():
+    """D1：兩個 example 的 report_final.docx 都不應有 ** 殘留。"""
+    for n in (1, 2):
+        docx = EXAMPLES_DIR / f"output_{n}" / "report_final.docx"
+        if not docx.exists():
+            pytest.skip(f"{docx} 不存在；請先跑 D1 smoke。")
+        text = _read_docx_text(docx)
+        assert not _has_asterisk_residue(text), (
+            f"output_{n}/report_final.docx 含 ** 殘留；前 200 字：{text[:200]!r}"
+        )
