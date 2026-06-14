@@ -188,14 +188,14 @@
 
 這些是「重新規劃」帶來的新任務（不計入原有 40/40）：
 
-| 任務ID | 名稱 | 等級 | 狀態 |
-|---|---|---|---|
-| A1 | Outliner workflow | L | 待做 |
-| A2 | Strategist 更新 | M | 待做 |
-| B1 | User confirmation workflow | S | 待做 |
-| C1 | topic-research web_search 整合 | M | 待做 |
-| C2 | html_to_docx bold 修復 | S | 待做 |
-| D1 | End-to-end smoke × 2 | L | 待做 |
+| 任務ID | 名稱 | 等級 | 狀態 | commit |
+|---|---|---|---|---|
+| A1 | Outliner workflow | L | ✅ done | 9efa7ad |
+| A2 | Strategist 更新 | M | ✅ done | 9efa7ad |
+| B1 | User confirmation workflow | S | ✅ done | 7cd47e3 |
+| C1 | topic-research web_search 整合 | M | ✅ done | 7cd47e3 |
+| C2 | html_to_docx bold 修復 | S | ✅ done | 34470e4 |
+| D1 | End-to-end smoke × 2 | L | ✅ done | abe60fe |
 
 ---
 
