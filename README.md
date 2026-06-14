@@ -263,6 +263,109 @@ For the full CLI spec, parameter list, and exit-code semantics, see [`architectu
 
 ---
 
+## Recommended Prompts
+
+Four tiers of LLM-facing prompts, from highest-level trigger to lowest-level building block. Use whichever tier matches how much control you want to keep.
+
+### Tier A — One-liner Trigger (paste into any LLM chat)
+
+For end-users who want the agent to drive the full **5-step phase flow** end-to-end.
+
+```
+Use Report-master to run the 5-step phase flow and produce a report.
+
+Topic: <one-line topic>
+Purpose: <term paper / business proposal / spec / government doc>
+Audience: <professor / client / peers / supervisor>
+Length: <pages or word count>
+Fonts: 標楷體 (CJK) + Times New Roman (Latin) — Traditional Chinese default
+Lock: <customise, or write "use examples/lock.md defaults">
+
+Start with Step 1 (planning + online research). Do NOT write content yet.
+Run quality_checker at the end of every chapter.
+Finish with: python scripts/build_spec_docx.py --page-numbers --toc
+```
+
+**Why this works:**
+- `Purpose` + `Audience` matter more than `Topic` — they set tone and format.
+- "Start with Step 1, do not write content" forces the research phase and blocks hallucination.
+- Omit `Lock` to inherit the conservative `examples/lock.md` defaults.
+
+### Tier B — Sub-agent Dispatch Prompts (one per role)
+
+For orchestrators who want to delegate individual steps. Pair with [`workflows/`](workflows/).
+
+**Strategist** ([`workflows/strategist.md`](workflows/strategist.md)) — Stage 1:
+```
+Run Stage 1: produce 0_strategist.md for topic "{TOPIC}".
+- Walk the 10 Confirmations (audience / depth / tone / sections / sources / ...).
+- Output RQ1..RQn (research questions), section breakdown, and a lock.md draft.
+- Do NOT write content. Planning only.
+```
+
+**Outliner** ([`workflows/phase-3-outliner.md`](workflows/phase-3-outliner.md)) — Stage 1.5:
+```
+Read 0_strategist.md, produce 0_outline.md (machine) + 0_outline_for_review.md (human).
+Per chapter: title, level, core question, required sources, estimated word count.
+Skeleton only — no prose. Wait for user confirmation (Step 4) before handing to Executor.
+```
+
+**Executor** ([`workflows/executor-base.md`](references/executor-base.md)) — Stage 2, per-section:
+```
+Read 0_outline.md chapter N + chapter_N_research.md (auto-trigger topic-research if missing).
+Produce chapter_N.html; honour fonts / line-spacing / bold rules from examples/lock.md.
+Run quality_checker before delivery. FAIL is not deliverable.
+```
+
+**Visual Reviewer** — Step 5 pre-flight (optional):
+```
+Run python scripts/html_to_pdf → pdftoppm → sample 4 pages → visual model evaluation.
+Verify: 標楷體 + Times New Roman loaded, no column overflow, page numbers + TOC present, no truncation.
+FAIL routes back to Step 2 or Step 3. Do NOT touch prose in Step 5.
+```
+
+### Tier C — Terminal-Only CLI (no LLM)
+
+For batch / CI / terminal-only flows.
+
+```bash
+cd /home/ubuntu/.openclaw/workspace/projects/report-master
+
+# 1) Minimal end-to-end: SPEC.md → DOCX (with page numbers + TOC)
+python scripts/build_spec_docx.py --page-numbers --toc
+
+# 2) Main pipeline orchestrator (3 modes — see SKILL.md §3)
+python -m scripts.report_gen --source <input> --output exports/ --lock examples/lock.md       # full auto
+python -m scripts.report_gen render --html bundle.html --output exports/ --format pdf,docx  # Stage 3 only
+python -m scripts.report_gen generate --lock examples/lock.md --output report_output/        # Stage 2 only
+
+# 3) Regression tests
+.venv/bin/python -m pytest tests/ -q
+```
+
+### Bonus — System Prompt Prefix (for agent builders)
+
+Drop this at the top of an agent's system message to bind it to the Report-master contract.
+
+```
+You are the Report-master agent.
+Before responding, read ~/.openclaw/skills/report-master/SKILL.md.
+Obey the 5-step phase flow: Step 1 plan+research → Step 2 expand → Step 3 outline → Step 4 user confirm → Step 5 format.
+User feedback routes via: content/facts → Step 2, section structure → Step 3, prose-only → Step 4 inline.
+Bilingual delivery: README.md (en) + README_zh.md (zh-TW) must stay in sync. No single-language drift.
+```
+
+### Choosing a Tier
+
+| Scenario | Use |
+|---|---|
+| "Just make me a report" | **A** (one-liner, paste into chat) |
+| "I'm orchestrating multiple steps with sub-agents" | **B** (role-by-role dispatch) |
+| "I'm scripting / CI / debugging the pipeline itself" | **C** (terminal) |
+| "I'm building an agent that *is* Report-master" | **Bonus** (system prompt) |
+
+---
+
 ## Pipeline — 5-Step Phase Flow
 
 Report-master runs as a **5-step phase flow**, with each step mapping to one or more underlying stages. Sub-agents should reason in terms of the 5 steps; developers drilling into implementation should reference the underlying stage table below.
@@ -484,6 +587,7 @@ These rules exist because we have hit the issues before — violating any of the
 | **v1.2** | ✅ Stage 1.5 Outliner + User confirmation gate + topic-research v1.1 + DOCX bold fix (4 core fixes) |
 | **v1.3** | ✅ 5-step phase flow + feedback routing (Plan / Expand / Structure / Confirm / Format) — see [Pipeline — 5-Step Phase Flow](#pipeline--5-step-phase-flow) |
 | **v1.3.1** | ✅ Issue #2 + #3 fix — table column widths + page-numbers / TOC CLI flags — see [Changelog](#changelog) |
+| **v1.3.2** | ✅ New `## Recommended Prompts` section — 4-tier prompt catalog (A: one-liner · B: sub-agent dispatch · C: terminal CLI · Bonus: system prompt prefix) — see [Recommended Prompts](#recommended-prompts) |
 | **v2.0** | Stage 4 pipeline-as-service + multi-locale |
 
 ---
@@ -502,6 +606,16 @@ Four fundamental workflow issues have been resolved:
 ---
 
 ## Changelog
+
+### v1.3.2 — 2026-06-14 (Recommended Prompts section)
+
+- **docs: new `## Recommended Prompts` section — 4-tier prompt catalog for LLM-driven use of the pipeline.**
+ - **Tier A** — one-liner trigger: paste into any LLM chat to drive the full 5-step phase flow end-to-end.
+ - **Tier B** — sub-agent dispatch prompts: one per role (Strategist / Outliner / Executor / Visual Reviewer), pairs with `workflows/`.
+ - **Tier C** — terminal-only CLI cheatsheet: minimal end-to-end, `report_gen` orchestrator, pytest regression.
+ - **Bonus** — system prompt prefix for agent builders integrating Report-master as a skill.
+- **docs: Progress table + Changelog updated to v1.3.2; version footer bumped.**
+- Bilingual sync (`README.md` + `README_zh.md`) per AGENTS.md #9.
 
 ### v1.3.1 — 2026-06-14 (Issue #2 / #3 fix)
 
@@ -575,7 +689,7 @@ Below are the in-project documents (in recommended reading order) and external r
 ---
 
 <p align="center">
-  <sub>Report-master v1.3.1 — Issue #2 / #3 fix (page numbers + table column widths) · 40/40 (100%) · 2026-06-14</sub><br>
+  <sub>Report-master v1.3.2 — Recommended Prompts section (4-tier prompt catalog) · 40/40 (100%) · 2026-06-14</sub><br>
   <sub>Built with 🐍 Python · 🧱 HTML intermediate · 📄 weasyprint · 📝 pandoc</sub>
   <sub>This is the English primary README · For the Chinese version, see <a href="README_zh.md">README_zh.md</a></sub>
 </p>

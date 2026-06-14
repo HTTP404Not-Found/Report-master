@@ -263,6 +263,109 @@ python -m scripts.report_gen generate \
 
 ---
 
+## 推薦提示詞 / Recommended Prompts
+
+四層 LLM 提示詞,從最上層一鍵觸發到最底層組裝零件都涵蓋。要保留多少控制權,就用對應那層。
+
+### Tier A — 一鍵觸發(貼到任何 LLM 對話框)
+
+給終端使用者:讓 agent 自行駕馭整個 **5 步驟 phase flow**。
+
+```
+用 Report-master 跑 5 步驟 phase flow 幫我做報告。
+
+主題: <一句話主題>
+用途: <學期報告 / 商業提案 / 技術規格書 / 政府文件>
+目標讀者: <教授 / 客戶 / 同儕 / 上司>
+預估長度: <頁數或字數>
+字體: 標楷體(CJK) + Times New Roman(拉丁)— 繁中預設
+Lock 設定: <客製字體/行距/章節,或寫 "用 examples/lock.md 預設">
+
+先跑 Step 1(規劃 + 線上研究),不要直接寫內容。
+每章結束前跑 quality_checker。
+最後用 python scripts/build_spec_docx.py --page-numbers --toc 收尾。
+```
+
+**為什麼有效:**
+- `用途` + `目標讀者` 比 `主題` 重要 — 決定語氣與格式
+- 「先跑 Step 1 不要直接寫」強制走研究階段,擋掉 hallucination
+- 不指定 Lock 就用 `examples/lock.md` 保守預設
+
+### Tier B — Sub-agent 派工(每個角色一份)
+
+給 orchestrator:委派單一步驟。搭配 [`workflows/`](workflows/) 使用。
+
+**Strategist**([`workflows/strategist.md`](workflows/strategist.md))— Stage 1:
+```
+跑 Stage 1:為主題「{TOPIC}」生成 0_strategist.md。
+- 10 Confirmations 強制走完(受眾/深度/語氣/章節/資料源/...)
+- 輸出含 RQ1..RQn(research questions)+ section breakdown + lock.md 草稿
+- 不要寫內容,只規劃
+```
+
+**Outliner**([`workflows/phase-3-outliner.md`](workflows/phase-3-outliner.md))— Stage 1.5:
+```
+讀 0_strategist.md,產出 0_outline.md(機讀)+ 0_outline_for_review.md(人讀)。
+每章:標題、層級、核心問題、所需資料源、預估字數。
+不要寫內文,只列骨架。完成後等用戶確認(Step 4)再交給 Executor。
+```
+
+**Executor**([`workflows/executor-base.md`](references/executor-base.md))— Stage 2 逐節:
+```
+讀 0_outline.md 章節 N + chapter_N_research.md(若無,自動觸發 topic-research)。
+產出 chapter_N.html,字體/行距/粗體符合 examples/lock.md。
+完成前跑 quality_checker,FAIL 不交付。
+```
+
+**Visual Reviewer**— Step 5 進場前(可選):
+```
+跑 python scripts/html_to_pdf → pdftoppm → 抽 4 頁 → 視覺模型評估
+(標楷體/TNR 載入、表格不溢出、頁碼/TOC 正確、無截斷)。
+FAIL 退回 Step 2 或 Step 3,不得在 Step 5 改字。
+```
+
+### Tier C — Terminal 直用(不靠 LLM)
+
+給批次 / CI / terminal-only 流程。
+
+```bash
+cd /home/ubuntu/.openclaw/workspace/projects/report-master
+
+# 1) 最小化端到端:SPEC.md → DOCX(帶頁碼 + TOC)
+python scripts/build_spec_docx.py --page-numbers --toc
+
+# 2) 主 pipeline orchestrator(3 種模式,看 SKILL.md §3)
+python -m scripts.report_gen --source <input> --output exports/ --lock examples/lock.md       # 全自動
+python -m scripts.report_gen render --html bundle.html --output exports/ --format pdf,docx  # 只 Stage 3
+python -m scripts.report_gen generate --lock examples/lock.md --output report_output/        # 只 Stage 2
+
+# 3) 跑回歸測試
+.venv/bin/python -m pytest tests/ -q
+```
+
+### Bonus — 系統提示詞開頭(給 agent builder)
+
+放在 agent system message 頂部,把它綁到 Report-master 契約上。
+
+```
+你是 Report-master agent。
+對話前先讀 ~/.openclaw/skills/report-master/SKILL.md。
+遵守 5 步驟 phase flow:Step 1 規劃+研究 → Step 2 擴充 → Step 3 編排 → Step 4 用戶確認 → Step 5 格式化。
+使用者回饋走 feedback routing:內容/事實 → Step 2,章節結構 → Step 3,純文字 → Step 4 inline。
+雙語交付:README.md(en)+ README_zh.md(zh-TW)必須同步更新,禁止單語漂移。
+```
+
+### 怎麼選?
+
+| 場景 | 用 |
+|---|---|
+| 「直接幫我做一份報告」 | **A**(一鍵貼到對話框) |
+| 「我要用 sub-agent 拆步驟」 | **B**(按角色派工) |
+| 「我在 script / CI / 調 pipeline 本體」 | **C**(terminal) |
+| 「我在打造一個 *就是* Report-master 的 agent」 | **Bonus**(系統提示詞) |
+
+---
+
 ## 三階段流程 / Pipeline Stages
 
 整個 pipeline 對外採 **5 步驟 phase flow** 描述,每一步對應一個或多個底層 stage。Sub-agent 請以 5 步驟框架思考;需要看實作時再下鑽到底層 stage 表格。
@@ -483,11 +586,22 @@ python -m scripts.report_gen \
 | **v1.2** | ✅ Stage 1.5 Outliner + User confirmation gate + topic-research v1.1 + DOCX bold 修復(4 大核心問題修復) |
 | **v1.3** | ✅ 5 步驟 phase flow + feedback routing(規劃 / 擴充 / 編排 / 確認 / 格式化)— 見 [三階段流程](#三階段流程--pipeline-stages) |
 | **v1.3.1** | ✅ Issue #2 + #3 修復 — table 列寬 + page-numbers / TOC CLI flags — 見 [更新日誌](#更新日誌--changelog) |
+| **v1.3.2** | ✅ 新增 `## 推薦提示詞` 章節 — 4 層 prompt 模板(A: 一鍵觸發·B: sub-agent 派工·C: terminal CLI·Bonus: 系統提示詞)— 見 [推薦提示詞](#推薦提示詞--recommended-prompts) |
 | **v2.0** | Stage 4 pipeline-as-service + multi-locale |
 
 ---
 
 ## 更新日誌 / Changelog
+
+### v1.3.2 — 2026-06-14(新增「推薦提示詞」章節)
+
+- **docs:新增 `## 推薦提示詞` 章節 — 4 層 LLM-facing prompt 模板。**
+ - **Tier A** — 一鍵觸發:貼到任何 LLM 對話框,讓 agent 自行駕馭完整 5 步驟 phase flow。
+ - **Tier B** — sub-agent 派工:每個角色一份(Strategist / Outliner / Executor / Visual Reviewer),搭配 `workflows/` 使用。
+ - **Tier C** — terminal-only CLI 速查:最小化端到端、`report_gen` orchestrator、pytest 回歸。
+ - **Bonus** — 系統提示詞開頭,給把 Report-master 整合成 skill 的 agent builder。
+- **docs:Progress 表格 + 更新日誌更新到 v1.3.2;version footer 同步。**
+- 雙語同步(`README.md` + `README_zh.md`),遵守 AGENTS.md #9。
 
 ### v1.3.1 — 2026-06-14(Issue #2 / #3 修復)
 
@@ -561,7 +675,7 @@ SOFTWARE.
 ---
 
 <p align="center">
-  <sub>Report-master v1.3.1 — Issue #2 / #3 修復(頁碼 + 表格列寬)· 40/40 (100%) · 2026-06-14</sub><br>
+  <sub>Report-master v1.3.2 — 新增「推薦提示詞」章節(4 層 prompt 模板)· 40/40 (100%) · 2026-06-14</sub><br>
   <sub>Built with 🐍 Python · 🧱 HTML intermediate · 📄 weasyprint · 📝 pandoc</sub>
   <sub>本 README 為中文版 · 英文版請見 <a href="README.md">README.md</a></sub>
 </p>
