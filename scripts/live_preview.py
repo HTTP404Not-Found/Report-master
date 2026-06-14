@@ -2,6 +2,14 @@
 
 對應 `workflows/live-preview.md` v1 + `tasks.md` T3-7。
 
+> **⚠️ v1.4.0 deprecation 警告**:此工具從 v1.4.0 起為 **legacy opt-in**;
+> 預設 `report_gen` pipeline 不再產 PDF(PDF 已從 user-facing output 移除,
+> DOCX 是 user-facing 交付物, HTML 是 Stage 2→3 中介產物)。
+> `html_to_pdf` 模組本身保留供 opt-in 重新啟用,所以本工具仍可運作,
+> 但 **user-facing pipeline 不再依賴它**。
+> 如要即時預覽 DOCX 排版, 推薦在 Editor 端用 pandoc 預覽
+> 或在瀏覽器裡直接 reload HTML(pipeline 仍會產 HTML 到 `report_output/`)。
+
 用途：
 - Watch `report_output/section_N.html` 的變動 → 自動重新渲染 PDF
 - 單次渲染模式（`--once`）給 CI / 一次性檢查用

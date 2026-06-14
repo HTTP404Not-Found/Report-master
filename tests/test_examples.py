@@ -14,7 +14,7 @@
   7. example_2 章節結構正確（≥ 6 章節）
   8. example_1 + example_2 line count > 100
   9. example_1 + example_2 章節 H1 標題正確
-  10. example_1 + example_2 產出 PDF/DOCX（如有 weasyprint + pandoc）
+  10. example_1 + example_2 產出 DOCX（v1.4.0 DOCX-only output; PDF 不再 user-facing）
   11. test_examples.py 是合法的 Python module（compile 不 crash）
   12. scripts/test_examples.py 的 EXAMPLE_1 / EXAMPLE_2 metadata 與 example_*.md 對應
 
@@ -288,19 +288,26 @@ def test_example_mds_have_valid_markdown_structure():
         assert h2_count >= 5, f"{md.name} 應有 ≥ 5 個 H2；找到 {h2_count}"
 
 
-# ─── Test 10（補充）: 產出 PDF/DOCX（如有環境）─────────────────────
+# ─── Test 10（補充）: 產出 DOCX（v1.4.0 DOCX-only output）───────────
+#
+# v1.4.0 changelog:
+#   - PDF 已從 user-facing output 移除;report_gen 不再產 PDF
+#   - DOCX 是 user-facing 交付物;HTML 是 Stage 2→3 中介產物
+#   - html_to_pdf.py 模組保留供 legacy opt-in,但 pipeline 不再依賴
+# 因此本測試只檢查 DOCX;不再檢查 PDF。
 
 @pytest.mark.parametrize("output_id,filename", [
-    (1, "report_final.pdf"),
     (1, "report_final.docx"),
-    (2, "report_final.pdf"),
     (2, "report_final.docx"),
 ])
-def test_output_files_pdf_docx(output_id: int, filename: str):
-    """若 smoke test 已產出 PDF/DOCX，檔案應存在且大小合理（> 100 bytes）。"""
+def test_output_files_docx_only(output_id: int, filename: str):
+    """v1.4.0: DOCX-only output。PDF no longer produced by default; this test
+    verifies DOCX exists and size is reasonable（> 100 bytes）。
+    若 smoke test 已產出 DOCX，檔案應存在且大小合理。
+    """
     target = EXAMPLES_DIR / f"output_{output_id}" / filename
     if not target.exists():
-        pytest.skip(f"{target} 不存在；可能 weasyprint/pandoc 未安裝")
+        pytest.skip(f"{target} 不存在；可能 pandoc 未安裝或 smoke test 未跑")
     size = target.stat().st_size
     assert size > 100, f"{target} 大小 {size} bytes 太小"
 

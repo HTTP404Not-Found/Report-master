@@ -605,6 +605,15 @@ python -m scripts.report_gen \
 
 ## 更新日誌 / Changelog
 
+### v1.4.1 — 2026-06-15(PDF 殘留清理 — deprecation 警告 + DOCX-only verify)
+
+- **docs(scripts)**:`scripts/visual_review.py` — module docstring + `_parse_args` description + `_cli` banner 加 v1.4.0 deprecation 警告。此工具為 legacy opt-in(`html_to_pdf` 模組仍保留供 opt-in, 所以工具本身可運作), 但預設 `report_gen` pipeline 不再依賴它。如要視覺 review DOCX, 推薦 `soffice --headless --convert-to pdf <docx> --outdir <tmp>` 轉臨時 PDF 再 review。
+- **docs(scripts)**:`scripts/live_preview.py` — module docstring 加 v1.4.0 deprecation 警告(同 visual_review 邏輯)。理由: PDF 即時預覽對 user-facing pipeline 已無意義;如要即時預覽 DOCX 排版, 改用 Editor 端 pandoc preview 或 reload browser HTML。
+- **test(tests)**:`tests/test_examples.py` — `test_output_files_pdf_docx` 重命名為 `test_output_files_docx_only`, parametrize 列表移除 `report_final.pdf` 條目, 只驗證 DOCX。函式 docstring 標註 v1.4.0 DOCX-only verify 語意(active 測試, 不 skip;若 DOCX 不存在 → pytest.skip)。
+- **out of scope**:`html_to_pdf.py` 模組保留(不刪除, 對應 v1.4.0 commit 236753c 的 opt-in 策略)、SPEC.md(v1.4.0 commit body 已列建議, 留 wai 顯式決策)、version footer 不 bump(本 commit 在 v1.4.0 範圍內的補充, v1.4.1 留給實質功能改動)。
+
+**Rationale(為什麼 deprecation 警告而非刪除)**:`visual_review.py` + `live_preview.py` 是專為 PDF 渲染設計的工具;既然 v1.4.0 (commit 236753c) 保留 `html_to_pdf.py` 模組供 legacy opt-in, 這兩個 PDF 預覽工具也跟 `html_to_pdf.py` 同步保留(但加 deprecation 警告)。刪除會破壞任何仍想 opt-in 產 PDF 的 user 的工具鏈;加警告可同時提示 user 改走 DOCX 路徑, 又保留 escape hatch。
+
 ### v1.3.3 — 2026-06-14(Section Opener Rule + 整合測試, D7)
 
 - **feat: Section Opener Rule(D7, wai 強調)** — H2 / H3 後必須至少有 1 段 ≥ 2 句的引導 `<p>`,禁止直接接 `<ul>` / `<ol>` / `<table>` / `<pre>` / `<dl>` / `<blockquote>` 等區塊元素。LLM 生成常見毛病是「列點優先勝過敘事節奏」,Section opener 是敘事流暢度的最小可行保證。

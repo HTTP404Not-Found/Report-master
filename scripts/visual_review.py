@@ -2,6 +2,16 @@
 
 對應 `workflows/visual-review.md` v1 + `tasks.md` T3-8。
 
+> **⚠️ v1.4.0 deprecation 警告**:此工具從 v1.4.0 起為 **legacy opt-in**;
+> 預設 `report_gen` pipeline 不再產 PDF(PDF 已從 user-facing output 移除,
+> HTML 是 Stage 2→3 中介產物, DOCX 是 user-facing 交付物)。
+> `html_to_pdf` 模組本身保留供 opt-in 重新啟用,所以本工具仍可運作,
+> 但 **user-facing pipeline 不再依賴它**。
+> 如要視覺 review DOCX, 推薦流程:
+>   `soffice --headless --convert-to pdf report_final.docx --outdir /tmp/vr`
+>   然後把 `/tmp/vr/report_final.pdf` 餵進本工具的 `--html` 位置
+>   (heuristic 只看 HTML 結構; 若只要看 PDF 排版, 用任何 PDF viewer 更直接)。
+
 用途：
 - 在 Executor 產出 HTML 之後、使用者正式交付之前，做最後一輪視覺檢查
 - 流程：auto-check (quality_checker) → render (html_to_pdf) → visual-inspection
@@ -536,8 +546,12 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         description=(
             "視覺自查：在 Executor 產出 HTML 之後、使用者交付之前做最後檢查。"
             "流程：auto-check (quality_checker) → render (html_to_pdf) → "
-            "visual-inspection (heuristic) → report (visual_review.md)。"
+            "visual-inspection (heuristic) → report (visual_review.md)。\n\n"
+            "⚠️ v1.4.0 起此工具為 legacy opt-in（預設 report_gen 不再產 PDF）。"
+            "如要視覺 review DOCX，建議先用 `soffice --headless --convert-to pdf "
+            "<docx> --outdir <tmp>` 轉成臨時 PDF，再用本工具 review；或直接用 PDF viewer。"
         ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--html", type=Path, default=None,
@@ -614,6 +628,14 @@ def _cli(argv: Optional[List[str]] = None) -> int:
         level=logging.WARNING if args.quiet else logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
+
+    # v1.4.0 deprecation banner（非 quiet / 非 json 模式才印，避免污染 machine-readable output）
+    if not args.quiet and not args.json:
+        print(
+            "⚠️  v1.4.0 起此工具為 legacy opt-in；預設 report_gen pipeline "
+            "不再產 PDF。如要視覺 review DOCX，建議先用 soffice 轉臨時 PDF，"
+            "或直接用系統 PDF viewer。詳見模組 docstring。"
+        )
 
     # 解析 HTML 檔清單
     try:
