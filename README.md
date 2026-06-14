@@ -4,7 +4,7 @@
 
 [![GitHub](https://img.shields.io/badge/github-HTTP404Not--Found%2FReport--master-blue?logo=github)](https://github.com/HTTP404Not-Found/Report-master)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python)](https://www.python.org/)
-[![Pipeline](https://img.shields.io/badge/pipeline-Stage%200%20%E2%86%92%203-success)](#-pipeline-stages)
+[![Pipeline](https://img.shields.io/badge/pipeline-5--Step%20Phase%20Flow-success)](#-pipeline--5-step-phase-flow)
 [![Progress](https://img.shields.io/badge/progress-40%2F40%20(100%25)-success)](#-progress)
 [![Tests](https://img.shields.io/badge/tests-418%2F421%20pass-brightgreen)](#-testing)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -20,7 +20,7 @@
 - [Quick Start](#quick-start)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Pipeline Stages](#pipeline-stages)
+- [Pipeline — 5-Step Phase Flow](#pipeline--5-step-phase-flow)
 - [Architecture](#architecture)
 - [Progress](#progress)
 - [Testing](#testing)
@@ -263,7 +263,25 @@ For the full CLI spec, parameter list, and exit-code semantics, see [`architectu
 
 ---
 
-## Pipeline Stages
+## Pipeline — 5-Step Phase Flow
+
+Report-master runs as a **5-step phase flow**, with each step mapping to one or more underlying stages. Sub-agents should reason in terms of the 5 steps; developers drilling into implementation should reference the underlying stage table below.
+
+1. **Plan + Research** — Strategist runs 10 Confirmations, converges user intent, and integrates web research (`topic-research`) into the planning lock.
+2. **Expand with Data** — Executor writes per-section HTML, with data sources explicitly pinned into the prompt (`chapter_N_research.md`).
+3. **Structure** — Outliner (`phase-3-outliner`) produces the Section Blueprint (`0_outline.md` + `0_outline_for_review.md`) before user confirmation.
+4. **User Confirmation** — explicit human-in-the-loop gate (`user-confirmation` workflow); writes `0_confirmed.json` before Executor starts.
+5. **Format** — mechanical PDF + DOCX export (`html_to_pdf` + `html_to_docx`); no content changes after this step.
+
+**Feedback routing (Step 4 → which step to rewind):**
+
+- **Content / data feedback** (numbers, citations, case studies, evidence) → **Step 2 (Expand)**
+- **Structure feedback** (chapter order, merge/split, hierarchy) → **Step 3 (Structure)**
+- **Pure wording feedback** (length, bullets, wording) → **Step 4 inline (Revise)**
+
+See `SKILL.md §2.1 / §4.1` for the full routing rules and §4.2 for fallback behaviour.
+
+### Pipeline Stages (Underlying Implementation)
 
 The pipeline is split into five stages, from "raw input in" to "deliverable out", each with explicit entry / exit / BLOCKING conditions. Stage 2.5 is an optional iteration stage, used for partial revisions when the human is not satisfied with v1.
 
@@ -373,6 +391,12 @@ Listing current "cannot do"s and tunable parameters transparently so contributor
 - **examples/** has 2 complete end-to-end report examples (natural science + technical report), each with a full pipeline run.
 - **mermaid-cli / katex-cli** are runtime wrappers and need to be pre-installed (`npm install -g ...`).
 
+### v1.3 (2026-06-14) — 5-Step Phase Flow
+
+- ✅ 5-step phase flow documented in `SKILL.md` §2: Plan → Expand → Structure → Confirm → Format.
+- ✅ Feedback routing (3 categories + fallback) documented in `SKILL.md` §2.1 / §4.1 / §4.2.
+- ✅ Bilingual README Pipeline section updated to reflect 5-step framework.
+
 ---
 
 ## Testing
@@ -457,7 +481,8 @@ These rules exist because we have hit the issues before — violating any of the
 |------|------|
 | **v1.0** | ✅ Track A + Track B complete |
 | **v1.1** | ✅ T3-1 / T3-2 / T3-3 / T3-4 / T3-6 / T3-7 workflows (Strategist + Executor + topic-research + create-template + generate-citations + live-preview) |
-| **v1.2** | 🚧 Stage 2.5 revise UI + auto-install of mermaid/katex CLI |
+| **v1.2** | ✅ Stage 1.5 Outliner + User confirmation gate + topic-research v1.1 + DOCX bold fix (4 core fixes) |
+| **v1.3** | ✅ 5-step phase flow + feedback routing (Plan / Expand / Structure / Confirm / Format) — see [Pipeline — 5-Step Phase Flow](#pipeline--5-step-phase-flow) |
 | **v2.0** | Stage 4 pipeline-as-service + multi-locale |
 
 ---
@@ -530,7 +555,7 @@ Below are the in-project documents (in recommended reading order) and external r
 ---
 
 <p align="center">
-  <sub>Report-master v1.9 · 40/40 (100%) · 2026-06-13</sub><br>
+  <sub>Report-master v1.3 · 40/40 (100%) · 2026-06-14</sub><br>
   <sub>Built with 🐍 Python · 🧱 HTML intermediate · 📄 weasyprint · 📝 pandoc</sub>
   <sub>This is the English primary README · For the Chinese version, see <a href="README_zh.md">README_zh.md</a></sub>
 </p>

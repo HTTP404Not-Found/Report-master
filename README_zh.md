@@ -265,6 +265,24 @@ python -m scripts.report_gen generate \
 
 ## 三階段流程 / Pipeline Stages
 
+整個 pipeline 對外採 **5 步驟 phase flow** 描述,每一步對應一個或多個底層 stage。Sub-agent 請以 5 步驟框架思考;需要看實作時再下鑽到底層 stage 表格。
+
+1. **規劃 + 線上補充資料** — Strategist 跑 10 Confirmations 收斂使用者意圖,並把 web research (`topic-research`) 整合進 planning lock。
+2. **用資料擴充拓展** — Executor 逐節寫 HTML,資料源顯式 pin 進 prompt (`chapter_N_research.md`)。
+3. **編排內容** — Outliner (`phase-3-outliner`) 在使用者確認前產出 Section Blueprint (`0_outline.md` + `0_outline_for_review.md`)。
+4. **用戶確認** — 明確的 human-in-the-loop gate (`user-confirmation` workflow);在 Executor 啟動前寫入 `0_confirmed.json`。
+5. **最後編排格式** — 純機械的 PDF + DOCX 輸出 (`html_to_pdf` + `html_to_docx`);本步驟之後不再改內容。
+
+**Feedback routing(步驟 4 → 退回哪一步)**:
+
+- **內容 / 資料回饋**(數字、引用、案例、證據) → **步驟 2(擴充)**
+- **結構回饋**(章節順序、拆/合併、層級) → **步驟 3(編排)**
+- **純文字回饋**(長度、bullet 化、措辭) → **步驟 4 inline(修訂)**
+
+完整 routing 規則見 `SKILL.md §2.1 / §4.1`,fallback 行為見 `§4.2`。
+
+### 底層 stage 實作 / Underlying Pipeline Stages
+
 整個 pipeline 分成五個階段,從「原料進來」到「交付物出去」,每一階段都有明確的入口、出口、與 BLOCKING 條件。Stage 2.5 是可選的迭代階段,用於人類對 v1 不滿意時做局部修訂。
 
 ```
@@ -372,6 +390,12 @@ graph LR
 - **examples/** 目前只有 1 個 smoke test,完整 3 個 example reports 累積中。
 - **mermaid-cli / katex-cli** 為 runtime wrapper,需預先安裝(`npm install -g ...`)。
 
+### v1.3 (2026-06-14) — 5 步驟 Phase Flow
+
+- ✅ `SKILL.md` §2 已寫入 5 步驟 phase flow 文件化:規劃 → 擴充 → 編排 → 確認 → 格式化。
+- ✅ Feedback routing(三分類 + 兜底規則)寫入 `SKILL.md` §2.1 / §4.1 / §4.2。
+- ✅ 雙語 README 的 Pipeline 章節已同步反映 5 步驟框架。
+
 ---
 
 ## 測試 / Testing
@@ -456,7 +480,8 @@ python -m scripts.report_gen \
 |------|------|
 | **v1.0** | ✅ Track A + Track B 完工 |
 | **v1.1** | ✅ T3-1 / T3-2 / T3-3 / T3-4 / T3-6 / T3-7 workflows(Strategist + Executor + topic-research + create-template + generate-citations + live-preview) |
-| **v1.2** | 🚧 Stage 2.5 revise UI + mermaid/katex CLI 自動安裝 |
+| **v1.2** | ✅ Stage 1.5 Outliner + User confirmation gate + topic-research v1.1 + DOCX bold 修復(4 大核心問題修復) |
+| **v1.3** | ✅ 5 步驟 phase flow + feedback routing(規劃 / 擴充 / 編排 / 確認 / 格式化)— 見 [三階段流程](#三階段流程--pipeline-stages) |
 | **v2.0** | Stage 4 pipeline-as-service + multi-locale |
 
 ---
@@ -518,7 +543,7 @@ SOFTWARE.
 ---
 
 <p align="center">
-  <sub>Report-master v1.9 · 40/40 (100%) · 2026-06-13</sub><br>
+  <sub>Report-master v1.3 · 40/40 (100%) · 2026-06-14</sub><br>
   <sub>Built with 🐍 Python · 🧱 HTML intermediate · 📄 weasyprint · 📝 pandoc</sub>
   <sub>本 README 為中文版 · 英文版請見 <a href="README.md">README.md</a></sub>
 </p>

@@ -196,3 +196,150 @@
 | C1 | topic-research web_search 整合 | M | 待做 |
 | C2 | html_to_docx bold 修復 | S | 待做 |
 | D1 | End-to-end smoke × 2 | L | 待做 |
+
+---
+
+## Phase 4: 5-Step Phase Flow 寫入（Pipeline Refinement）
+
+> **對應文件**：`SKILL.md` v1.3 + `planning/skill-update-plan.md` v1
+> **引入日期**：2026-06-14
+> **wai 確認 5 步驟 phase flow**：2026-06-14 06:30
+> **狀態**：規劃完成，待 wai 決策開工
+
+### E1: 5 步驟 phase flow 寫入 SKILL.md
+**等級**: S  
+**預估**: 1–2h（單一文件改動）
+
+**做什麼**：
+- 更新 `SKILL.md` v1.0 → v1.3
+- 主要修改點（見 `planning/skill-update-plan.md` Section A.3）：
+  - frontmatter description 加入 5 步驟摘要
+  - §2 標題改為「Pipeline — 5-Step Phase Flow」+ 插入 §2.0（5 步驟總覽）+ §2.1（feedback routing）
+  - §4 改寫為「Step 4 反饋路由（Feedback Routing）」
+  - §5 workflow 關係加上 5 步驟歸屬標記
+  - §10 失敗指引按 5 步驟重排
+  - §11 版本演進新增 v1.3 行
+- 既有 §6（兩個 AI 角色）/ §7（lock 引用規則）/ §8（ppt-master 差異）/ §9（Stage 3 驗收）**不動**
+
+**DoD**：
+- `wc -l SKILL.md` > 280（原為 279）
+- 5 步驟 5 個 H3 子段落都存在（§2.0、§2.1、§2.2）
+- §4 表格內含 feedback routing 三分類 + 兜底規則
+- §11 v1.3 行存在
+- 全 pytest 仍 428 pass（SKILL.md 改動不影響 tests，但 wai 可要求 sub-agent 跑一次確認）
+- `git commit` 成功（不 push）
+
+**交付**：更新的 `SKILL.md`（v1.0 → v1.3）
+
+---
+
+### E2: 雙語 README 同步（2026-06-14 新規則）
+**等級**: S  
+**預估**: 30min–1h
+
+**做什麼**：
+- 更新 `README.md`（en）Pipeline 章節為 5 步驟框架
+- 更新 `README_zh.md`（zh-TW）對應章節鏡像
+- 更新 Progress 表格新增 v1.3 一行（**main agent 責任** — 批次收尾時做；本任務是 sub-agent feature-level 同步）
+- 更新 footer 版本號 v1.0 → v1.3
+
+**DoD**：
+- README.md 與 README_zh.md 的 Pipeline 章節**雙語內容一致**（無 en-only / zh-only 漂移）
+- 雙語都提及 5 步驟 phase flow + feedback routing
+- 變更與 E1 commit 配對（不需獨立 commit）
+
+**交付**：`README.md` + `README_zh.md` 更新（與 E1 同 commit）
+
+---
+
+### E3: skill meta 更新（report-master-dev）
+**等級**: S  
+**預估**: 15min
+
+**做什麼**：
+- 更新 `~/.openclaw/workspace/skills/report-master-dev/SKILL.md`
+- description 加上 5 步驟 phase flow 摘要
+- 新增「v1.3: 5 步驟 phase flow + feedback routing」條目到版本演進（若該檔有版本演進區段；目前無，可加）
+
+**DoD**：
+- 描述 < 160 bytes
+- 提及 5 步驟 phase flow
+- `git commit` 成功（sub-agent 完成 E1+E2+E3 後，由 main agent 批次 push）
+
+**交付**：更新的 skill meta SKILL.md
+
+---
+
+### E4: 既有 6 個任務狀態追溯更新（追溯性維護）
+**等級**: S  
+**預估**: 15min
+
+**做什麼**（可選，看 wai 決策）：
+- 更新 `tasks.md` L155–165 表格的 status 欄位：
+  - A1 Outliner workflow: 待做 → ✅ done
+  - A2 Strategist 更新: 待做 → ✅ done
+  - B1 User confirmation workflow: 待做 → ✅ done
+  - C1 topic-research web_search 整合: 待做 → ✅ done
+  - C2 html_to_docx bold 修復: 待做 → ✅ done
+  - D1 End-to-end smoke × 2: 待做 → ✅ done
+- 對應 MEMORY.md「4 大核心問題已修復（2026-06-13 16:48）」
+- 同時在 Phase 4 章節加入「已完成工作量」對照（4 大核心問題修復對應 6 個任務全 ✅）
+
+**DoD**：
+- tasks.md L155–165 表格 6 個 status 全改為 ✅ done
+- 對應 commit hash 填入（從 `git log` 撈）
+
+**交付**：更新的 `tasks.md` 表格
+
+> **建議**：E4 屬追溯性維護，可由 wai 決策是否歸入本次 v1.3 commit，或另開 commit (`docs(report-master): 追溯更新 tasks.md 6 個任務狀態`)。
+
+---
+
+### E5: 5 步驟 phase flow 驗收測試（端到端 smoke）
+**等級**: M  
+**預估**: 2–3h
+
+**做什麼**（v1.3 完成後，下次報告生成時驗證）：
+- 走一次完整 5 步驟流程，產出 `examples/output_3/`（或更新 `output_1` / `output_2`）
+- 驗證：
+  - Step 1 topic-research 整合是否順暢
+  - Step 2 資料源是否真實 pin 進 prompt
+  - Step 3 Outliner 產出是否合用
+  - Step 4 feedback routing 三分類是否正確觸發
+  - Step 5 export 是否乾淨
+- 更新 `tests/test_workflow_docs.py` 加入「5 步驟 phase flow 存在於 SKILL.md」測試（可選）
+
+**DoD**：
+- 端到端生成 1 份新 example 報告
+- 5 步驟 log 都有對應輸出
+- 全 pytest 仍 428+ pass
+- `git commit` 成功
+
+**交付**：`examples/output_3/` + 可能更新 `tests/test_workflow_docs.py`
+
+> **不列入 v1.3 必做**：E5 是 v1.3 之後的驗收，可延後到下次實際使用時做。
+
+---
+
+### Phase 4 依賴關係
+
+```
+E1 (SKILL.md 更新)
+ ├── E2 (雙語 README 同步)   ← 配對 commit
+ ├── E3 (skill meta 更新)     ← 可與 E1+E2 同 commit
+ └── E4 (追溯性維護)          ← 可選；wai 決策
+
+E5 (端到端驗收)  ← 延後到 v1.3 之後首次使用時
+```
+
+### Phase 4 預估總工時
+
+| Task | 等級 | 工時 |
+|------|------|------|
+| E1 | S | 1–2h |
+| E2 | S | 30min–1h |
+| E3 | S | 15min |
+| E4 | S | 15min（可選） |
+| E5 | M | 2–3h（延後） |
+| **合計（必做）** | | **2–3.5h** |
+| **合計（含 E4 + E5）** | | **4.5–6.5h** |

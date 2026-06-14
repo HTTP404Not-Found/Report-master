@@ -1,13 +1,14 @@
 ---
 name: report-master
-description: Generate professional PDF + DOCX reports from Markdown / HTML sources via the report-master pipeline. Use when the user asks to "生成報告書", "做 PDF 報告", "做 DOCX 報告", "從 Markdown 出報告", "make a report", "compile report", or wants a structured deliverable (academic paper, business proposal, spec, government document). Runs Stage 0 (source probe) → Stage 1 (lock contract) → Stage 2 (per-section HTML generation + quality gate) → Stage 3 (PDF + DOCX parallel render). Do NOT use for slide decks (use ppt-master) or short notes.
+description: Generate professional PDF + DOCX reports from Markdown / HTML sources via the report-master pipeline. Use when the user asks to "生成報告書", "做 PDF 報告", "做 DOCX 報告", "從 Markdown 出報告", "make a report", "compile report", or wants a structured deliverable (academic paper, business proposal, spec, government document). **Pipeline 採 5 步驟 phase flow：(1) 規劃+線上補充資料 → (2) 用資料擴充拓展 → (3) 編排內容 → (4) 用戶確認 → (5) 最後編排格式。底層實作為 Stage 0 (source probe) → Stage 1 (lock contract + topic-research) → Stage 1.5 (phase-3-outliner) → Stage 2 (per-section HTML generation + quality gate) → Stage 3 (PDF + DOCX parallel render)。** Do NOT use for slide decks (use ppt-master) or short notes.
 ---
 
 # SKILL.md — Report-master 主 workflow authority
 
-> **文件版本：v1.0** · 對應 SPEC.md v0.3 + architecture.md v1.0 · 2026-06-13
+> **文件版本：v1.3** · 對應 SPEC.md v0.3 + architecture.md v1.0 + planning/skill-update-plan.md v1 · 2026-06-14
+> **5 步驟 phase flow** 由 wai 於 2026-06-14 06:30 確認。
 > **Reference**：reverse-engineer-ppt-master（相似設計哲學；HTML 中間格式 vs SVG 中間格式）
-> **Inherits**：Spec-Lock anti-drift、role specialization (Strategist / Executor)、per-section quality gate、examples as integration tests。
+> **Inherits**：Spec-Lock anti-drift、role specialization (Strategist / Executor)、per-section quality gate、examples as integration tests、5 步驟 phase flow + feedback routing。
 
 ---
 
@@ -31,7 +32,62 @@ description: Generate professional PDF + DOCX reports from Markdown / HTML sourc
 
 ---
 
-## 2. Pipeline（Stage 0 → Stage 1 → Stage 2 → Stage 3）
+## 2. Pipeline — 5-Step Phase Flow（規劃→擴充→編排→確認→格式化）
+
+Report-master 對外提供 5 步驟 phase flow；底層實作為既有 Stage 0–3 + `workflows/*.md`。所有 sub-agent 在生成 / 修改 / 排錯時，**應以 5 步驟框架思考與溝通**，遇到具體指令再下鑽到對應 stage 與 workflow。
+
+### 2.0 5 步驟 phase flow 總覽（給 sub-agent 與使用者的「心智模型」）
+
+| 步驟 | 語意 | 底層 stage 對應 | 主要 workflow | sub-agent 行為 |
+|------|------|----------------|----------------|----------------|
+| **1. 規劃 + 線上補充資料** | 收斂使用者意圖 + 同步整合 web research | Stage 0 + Stage 1 | `topic-research`（整合進 planning）、`strategist` | 啟動 topic-research 蒐集 high-level 證據；Strategist 跑 10 Confirmations；**研究綁在規劃裡，不寫完才補** |
+| **2. 用資料擴充拓展** | 寫作有憑有據，資料源 pin 進 prompt 可追溯 | Stage 1.5 → Stage 2 | `topic-research`（Content Expansion 子階段）、`executor` | Executor 對每節讀 `chapter_N_research.md`（如缺，自動觸發 topic-research + `web_search` 補足）；**所有資料源在 prompt 中顯式列出** |
+| **3. 編排內容** | 結構先定，內容對齊骨架 | Stage 1.5（Outliner） | `phase-3-outliner` | 產出 `0_outline.md`（機讀藍圖）+ `0_outline_for_review.md`（人讀摘要）；每章標題、層級、核心問題、所需資料、預估字數 |
+| **4. 用戶確認** | 看到結構 + 內容再確認；DOCX 還沒碰，改起來便宜 | （gate 階段） | `user-confirmation` | 等待使用者回覆「OK / 修改 / REDO」；寫入 `0_confirmed.json`；Executor 啟動前必讀此檔 |
+| **5. 最後編排格式** | 純機械 export（DOCX / 粗體修復），內容不再變動 | Stage 2.5 → Stage 3 | `visual-review`（可選）、`html_to_pdf`、`html_to_docx` | 跑 export_checker 7 項驗收；任何內容異動 → 退回步驟 2（嚴禁在 step 5 改字 / 改措辭） |
+
+**底層 Stage 編號 → 5 步驟 映射**：
+
+```
+Step 1 (規劃+研究)     = Stage 0 (source probe) + Stage 1 (Strategist) + topic-research 整合
+Step 2 (擴充)          = Stage 2 (Executor) + topic-research Content Expansion
+Step 3 (編排)          = Stage 1.5 (phase-3-outliner)  ← 注意：可在 Step 2 之前或之後，依「先骨架後肉 / 先肉後整骨」二擇一
+Step 4 (確認)          = user-confirmation gate
+Step 5 (格式化)        = Stage 2.5 (visual-review 可選) + Stage 3 (html_to_pdf + html_to_docx)
+```
+
+> **⚠️ Step 3 在流程中的位置是 wai 須明確決策的開放問題**（見 Section D.1 Q1）：是要「骨架先於肉」（Outliner 早於 Executor）還是「肉先於骨架」（Outliner 校對 Executor 輸出）？
+
+#### 2.1 5 步驟的 Feedback Routing（步驟 4 → 退回規則）
+
+步驟 4（用戶確認）收到「修改」回饋時，依回饋性質退回對應步驟：
+
+| 回饋類型 | 退回步驟 | 觸發 workflow | 動作 |
+|----------|----------|----------------|------|
+| **內容 / 事實 / 資料問題**（數字錯、引用錯、案例錯、證據不足） | **→ Step 2（擴充）** | `topic-research` v1.1 Content Expansion 補強 → `executor` 重生成該節 | 重跑 `web_search` 取得新證據；更新 `chapter_N_research.md`；Executor 重新生成該節 HTML（保留其他節不動） |
+| **章節順序 / 結構問題**（章節該拆 / 該合 / 該換位置） | **→ Step 3（編排）** | `phase-3-outliner` | 重新規劃 outline；**可能** 連動影響多節 Executor 輸出 |
+| **純文字 / 標題措辭**（某段太冗、結論改 bullet、標題換個說法） | **→ Step 4 inline 改**（不退回） | `revise`（Stage 2.5） | 用 `revise_helper` 做單節 HTML 局部修訂；不重跑 Outliner、不重跑研究 |
+
+**判定準則**（給 sub-agent 用）：
+
+- 涉及「資料、數字、引用、案例、定義」→ **Step 2**
+- 涉及「章節、順序、層級、架構、骨架」→ **Step 3**
+- 涉及「措辭、文法、長度、bullet 化、標題用字」→ **Step 4 inline**
+- 同時多類 → 從**結構→內容→文字** 順序處理（先 Step 3、再 Step 2、最後 Step 4 inline）
+
+#### 2.2 5 步驟 vs 既有 Stage 編號 對照速查表
+
+| 5 步驟 | 對應 Stage | 對應 workflow(s) | 主要產出 | 主要消費 |
+|--------|------------|------------------|----------|----------|
+| Step 1 規劃 | Stage 0 + Stage 1 | `topic-research`、`strategist` | `0_strategist.md`（含 RQ1…RQn）、`research_notes.md` | `phase-3-outliner` |
+| Step 2 擴充 | Stage 1.5 → Stage 2 | `topic-research` v1.1、 `executor` | `chapter_N_research.md`、`chapter_N.html` | `bundle` |
+| Step 3 編排 | Stage 1.5（Outliner） | `phase-3-outliner` | `0_outline.md`、`0_outline_for_review.md` | `user-confirmation`、`executor` |
+| Step 4 確認 | （gate） | `user-confirmation` | `0_confirmed.json` | `executor` 啟動前必讀 |
+| Step 5 格式化 | Stage 2.5 + Stage 3 | `visual-review`（可選）、`html_to_pdf`、`html_to_docx` | `report_final.pdf`、`report_final.docx` | 使用者交付 |
+
+---
+
+下面是底層 Stage 細節（**developer-facing**，與上方 5 步驟框架**兩個視角並存**）：
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -118,21 +174,34 @@ python -m scripts.report_gen generate \
 
 ---
 
-## 4. Stage 2.5 迭代迴圈觸發條件
+## 4. Step 4 反饋路由（Feedback Routing）
 
-| 條件 | 動作 |
-|------|------|
-| 人類對 v1 不滿意 | 選定 section IDs，產 v2 |
-| 字體/顏色偏離 lock | quality_checker 自動 BLOCKING，重生該節 |
-| 圖表編號不連續 | quality_checker BLOCKING，重生該節 |
-| 交叉引用 broken | quality_checker BLOCKING，重生該節 |
-| 大改（>30% 內容） | 回到 Stage 1 重跑 Strategist |
+> 本章取代舊版「Stage 2.5 迭代觸發條件」。5 步驟框架下，**所有使用者回饋走 §2.1 的 feedback routing 三分類**（內容→Step 2、結構→Step 3、文字→Step 4 inline）。
+> 舊版「>30% 大改 → 回 Stage 1」規則**保留為兜底**（適用於結構性崩壞或多步驟同時失敗），但**首選**走 feedback routing。
 
-`delta_checker.py` 永遠保留 `report_v_n.html` 不覆蓋。
+### 4.1 Feedback Routing 三分類（與 §2.1 重複一次以便查閱）
+
+| 回饋類型 | 判定關鍵字 | 退回步驟 | 觸發 workflow | 動作 |
+|----------|------------|----------|----------------|------|
+| 內容 / 事實 / 資料 | 數字、引用、案例、證據、定義、來源 | Step 2 擴充 | `topic-research` v1.1 + `executor` | 重跑 `web_search` 補強；重生成該節 HTML |
+| 章節順序 / 結構 | 章節、章序、拆、合併、位置、層級、骨架 | Step 3 編排 | `phase-3-outliner` | 重規劃 outline；連動影響多節 |
+| 純文字 / 標題措辭 | 太長、太短、bullet 化、措辭、換句話說 | Step 4 inline | `revise`（Stage 2.5 局部修訂） | 單節 HTML 修訂；不動 outline、不重跑研究 |
+
+### 4.2 兜底規則（保留舊 Stage 2.5 行為）
+
+| 條件 | 動作 | 對應 5 步驟 |
+|------|------|--------------|
+| 多步驟同時失敗（如 Step 1+2+3 全錯） | 回到 Step 1 重跑整體 | 全 5 步驟 |
+| 使用者要求「全部打掉重來」 | 回到 Step 1 | 全 5 步驟 |
+| `lock_signature` 不一致（`resume-execute` 偵測） | 回到 Step 1 重收斂 | Step 1 + 後續全部 |
+| quality_checker 連續 2 次 BLOCKING 同一節 | 退回 Step 2 重擴充 | Step 2 |
+| 圖表編號不連續、交叉引用 broken | quality_checker BLOCKING，退回 Step 2 | Step 2 |
+
+`delta_checker.py` 與 `revise_helper.py` 行為不變（不覆蓋既有 `report_v_n.html`）。
 
 ---
 
-## 5. 與其他 workflow 的關係
+## 5. 與其他 workflow 的關係（含 5 步驟歸屬標記）
 
 ```
                        ┌──────────────┐
@@ -153,10 +222,14 @@ python -m scripts.report_gen generate \
         └──────────────┘ └──────────────┘ └──────────────┘
 ```
 
-- `generate-citations`：Stage 1 期間呼叫，建立/更新 BibTeX + CSL
-- `live-preview`：Stage 2 期間呼叫，逐節瀏覽器預覽
-- `visual-review`：Stage 3 之前可選跑，PDF 截圖自查
-- `resume-execute`：Stage 2/3 斷點續傳
+- `topic-research`：Step 1（高層研究）+ Step 2（Content Expansion）— 雙重角色
+- `generate-citations`：Step 1 期間呼叫（建立 / 更新 BibTeX + CSL）
+- `phase-3-outliner`：**Step 3** 編排核心（吃 RQs → 產 Section Blueprint）
+- `user-confirmation`：**Step 4** 確認 gate（讀 outline → 等使用者 → 寫 `0_confirmed.json`）
+- `live-preview`：Step 5 期間呼叫（逐節瀏覽器預覽）
+- `visual-review`：Step 5 之前可選跑（PDF 截圖自查）
+- `revise`：Step 4 inline 反饋（純文字修訂，不退回）
+- `resume-execute`：Step 2/3 斷點續傳
 
 ---
 
@@ -251,17 +324,30 @@ python -m scripts.report_gen generate \
 
 ---
 
-## 10. 失敗 / 求助指引
+## 10. 失敗 / 求助指引（依 5 步驟分類）
 
-| 症狀 | 原因 / 處理 |
-|------|-------------|
-| `LockMissingFieldsError` | 補 report_lock.md 欄位後重跑 Stage 1 |
-| `QualityCheckError: display: flex` | 改用 block flow（見 shared-standards.md §3） |
-| `FontNotFoundError: 標楷體` | 見 `fonts/README.md` 安裝指引；或 `apt install fonts-noto-cjk` |
-| `PandocNotFoundError` | `apt install pandoc` 或下載 binary；見 `docs/.env.example` |
-| `MMDCNotFoundError` | `npm install -g @mermaid-js/mermaid-cli`；或允許 Stage 2 保留 `<pre class="mermaid">` 待後處理 |
-| `KaTeXNotFoundError` | 同上；可選 |
-| `ExportCheckFailed: page count=0` | weasyprint 渲染失敗；檢查 HTML 結構與字體路徑 |
+### 10.1 依 5 步驟分類的失敗處理
+
+| 步驟 | 症狀 | 原因 / 處理 |
+|------|------|-------------|
+| **Step 1（規劃）** | `0_strategist.md` 缺 RQ 區塊 | 補 10 Confirmations；走 `strategist` workflow §3 |
+| **Step 1** | `research_notes.md` 為空且無 source | 走 `topic-research`（無源路徑）；sub-questions ≥ 3 才 PASS |
+| **Step 1** | web_search 無結果 | 降級：Executor 使用 LLM 內部知識；章節標註 `[research: insufficient data]` |
+| **Step 2（擴充）** | `chapter_N_research.md` 缺且 Executor 卡住 | 自動觸發 topic-research 子階段；如仍無資料 → 降級同上 |
+| **Step 2** | `QualityCheckError: display: flex` | 改用 block flow（見 `shared-standards.md` §3） |
+| **Step 2** | `LockMissingFieldsError` | 補 `report_lock.md` 欄位後退回 Step 1 |
+| **Step 3（編排）** | Outliner 產出章節數 > 10 | Outliner 先問使用者「章節數是否太多？」再繼續 |
+| **Step 3** | Outliner 邏輯順序不通過 | 退回 Step 3 重規劃；見 `phase-3-outliner.md` §4.4 拓樸規則 |
+| **Step 4（確認）** | `0_confirmed.json` 缺 / `executor_can_start=false` | Executor 拒絕啟動；走 `user-confirmation` 重跑 |
+| **Step 4 inline** | `delta_checker.check_lock()` BLOCKING | `revise_helper` 不應改 lock；還原後重跑 |
+| **Step 5（格式化）** | `FontNotFoundError: 標楷體` | 見 `fonts/README.md` 安裝指引；或 `apt install fonts-noto-cjk` |
+| **Step 5** | `PandocNotFoundError` | `apt install pandoc` 或下載 binary；見 `docs/.env.example` |
+| **Step 5** | `MMDCNotFoundError` | `npm install -g @mermaid-js/mermaid-cli`；或允許 Stage 2 保留 `<pre class="mermaid">` 待後處理 |
+| **Step 5** | `KaTeXNotFoundError` | 同上；可選 |
+| **Step 5** | `ExportCheckFailed: page count=0` | weasyprint 渲染失敗；檢查 HTML 結構與字體路徑 |
+| **Step 5** | DOCX 內文殘留 `**` | 檢查 `bundle.py` 上游清理 + `html_to_docx` `handle_strong()`（見 C2 bold 修復） |
+| **跨步驟** | pytest 任何 fail | 立即停止，問 wai |
+| **跨步驟** | git conflict / 多 agent commits 衝突 | main agent resolve，不打斷 sub-agent |
 
 ---
 
@@ -270,11 +356,12 @@ python -m scripts.report_gen generate \
 | 版本 | 狀態 | 說明 |
 |------|------|------|
 | v0.0 | done | placeholder |
-| v1.0 | **current** | Track B 完工：report_gen + quality_checker + html_to_* + validators + checkers + renderers + tests + examples |
-| v1.1 | **current** | T3-1 Strategist workflow + T3-2 Executor workflow（逐節 + per-section quality gate） |
-| v1.2 | planned | Stage 2.5 迭代 UI；mermaid/katex CLI 自動安裝 |
+| v1.0 | done | Track B 完工：report_gen + quality_checker + html_to_* + validators + checkers + renderers + tests + examples |
+| v1.1 | done | T3-1 Strategist workflow + T3-2 Executor workflow（逐節 + per-section quality gate） |
+| v1.2 | done | Stage 1.5 Outliner 拆分 + User confirmation gate + topic-research v1.1 Content Expansion + DOCX bold 修復（4 大核心問題修復） |
+| **v1.3** | **planned** | **5 步驟 sub-agent phase flow 上層抽象（規劃→擴充→編排→確認→格式化）+ feedback routing 三分類（取代舊 Stage 2.5 觸發規則）** |
 | v2.0 | TBD | Stage 4 / pipeline-as-service；multi-locale |
 
 ---
 
-*SKILL.md v1.0 — 對應 SPEC.md v0.3 + architecture.md v1.0, 2026-06-13*
+*SKILL.md v1.3 — 對應 SPEC.md v0.3 + architecture.md v1.0 + planning/skill-update-plan.md v1, 2026-06-14*
