@@ -6,7 +6,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python)](https://www.python.org/)
 [![Pipeline](https://img.shields.io/badge/pipeline-Stage%200%20%E2%86%92%203-success)](#-三階段流程--pipeline-stages)
 [![Progress](https://img.shields.io/badge/progress-40%2F40%20%2B%206%2F6%20TR--2%20(100%25)-success)](#-開發進度--progress)
-[![Tests](https://img.shields.io/badge/tests-429%2F431%20pass-brightgreen)](#-測試--testing)
+[![Tests](https://img.shields.io/badge/tests-450%2F452%20pass-brightgreen)](#-測試--testing)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 > 英文版請見 [`README.md`](README.md)。

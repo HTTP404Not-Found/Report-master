@@ -1,12 +1,12 @@
 # Report-master
 
-> **AI-driven professional report generation pipeline.** From Markdown / HTML / PDF / DOCX / URL sources, it auto-produces **dual deliverables (PDF + DOCX)** and uses a `report_lock.md` anti-drift contract to keep long-form reports visually and narratively consistent.
+> **AI-driven professional report generation pipeline.** From Markdown / HTML / PDF / DOCX / URL sources, it auto-produces **DOCX** as the primary user-facing deliverable, and uses a `report_lock.md` anti-drift contract to keep long-form reports visually and narratively consistent. **v1.4.0 — DOCX-only user-facing output**; HTML is the internal intermediate (also available as `--format html,docx` named output); PDF is no longer produced by the orchestrator (the `html_to_pdf.py` module is retained for legacy opt-in).
 
 [![GitHub](https://img.shields.io/badge/github-HTTP404Not--Found%2FReport--master-blue?logo=github)](https://github.com/HTTP404Not-Found/Report-master)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python)](https://www.python.org/)
 [![Pipeline](https://img.shields.io/badge/pipeline-5--Step%20Phase%20Flow-success)](#-pipeline--5-step-phase-flow)
 [![Progress](https://img.shields.io/badge/progress-40%2F40%20%2B%206%2F6%20TR--2%20(100%25)-success)](#-progress)
-[![Tests](https://img.shields.io/badge/tests-444%2F446%20pass-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-450%2F452%20pass-brightgreen)](#-testing)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 > Looking for the Chinese version? See [`README_zh.md`](README_zh.md).
@@ -32,9 +32,9 @@
 
 ## About
 
-**Report-master** is an **AI-driven professional report generation pipeline**. It treats **HTML as the intermediate format** between AI content generation and engineering rendering, then runs two independent paths — weasyprint (HTML → PDF) and pandoc (HTML → DOCX) — to produce **dual deliverables (PDF + DOCX)**. A machine-executable `report_lock.md` (a YAML schema with 17 required fields) acts as the formatting contract to prevent both visual drift and narrative drift in long-form reports.
+**Report-master** is an **AI-driven professional report generation pipeline**. It treats **HTML as the internal intermediate format** between AI content generation and engineering rendering, and runs a single primary path — pandoc (HTML → DOCX) — to produce a **DOCX user-facing deliverable** (since v1.4.0; the PDF path is retired). HTML also remains user-accessible via `--format html,docx`. A machine-executable `report_lock.md` (a YAML schema with 17 required fields) acts as the formatting contract to prevent both visual drift and narrative drift in long-form reports.
 
-The design is inspired by the same author's `ppt-master` family (slide-deck generators), but swaps PPTX for PDF + DOCX, and adds **table of contents, section numbering, footnotes, cross-references, and bibliography** — the must-have elements of any formal document. In one sentence: **give it a lock + glossary + section outline, and it will generate section-by-section HTML, then emit PDF and DOCX in parallel.**
+The design is inspired by the same author's `ppt-master` family (slide-deck generators), but swaps PPTX for DOCX (with HTML as the first-class pipeline intermediate), and adds **table of contents, section numbering, footnotes, cross-references, and bibliography** — the must-have elements of any formal document. In one sentence: **give it a lock + glossary + section outline, and it will generate section-by-section HTML, then emit a single DOCX as the user-facing deliverable.**
 
 ### Key Differences vs. ppt-master
 
@@ -42,8 +42,8 @@ The table below summarises how the two systems differ in output format, intermed
 
 | Dimension | ppt-master | Report-master |
 |------|-----------|---------------|
-| Output | PPTX (single) | **PDF + DOCX (dual deliverables)** |
-| Intermediate | SVG | **HTML** (block flow is friendlier to PDF/DOCX) |
+| Output | PPTX (single) | **DOCX** (v1.4.0+ user-facing; HTML is pipeline intermediate + opt-in named output; `html_to_pdf.py` is kept for legacy opt-in) |
+| Intermediate | SVG | **HTML** (block flow is friendlier to DOCX) |
 | AI unit | per-slide SVG | **per-section HTML** (section-by-section + per-section quality gate) |
 | Structure | slides | **sections (cover → TOC → body → bibliography)** |
 | Numbering | slide # | **section / figure / formula numbering** |
@@ -109,7 +109,7 @@ The project is split into four phases. **Phase 3 is complete (40/40 = 100%).** A
 
 ## Quick Start
 
-Five minutes to a passing smoke test — clone, create the venv, install dependencies, run the example, and you will get `report_<timestamp>.pdf` and `report_<timestamp>.docx` under `/tmp/rm-test`. All commands are copy-pasteable; an exit code of 0 means PASS.
+Five minutes to a passing smoke test — clone, create the venv, install dependencies, run the example, and you will get `report_<timestamp>.docx` under `/tmp/rm-test`. All commands are copy-pasteable; an exit code of 0 means PASS. (v1.4.0: DOCX is the user-facing deliverable; pass `--format html,docx` to also emit a named HTML file.)
 
 ```bash
 # 1. clone the repo and enter the venv
@@ -208,11 +208,11 @@ python -m scripts.config check
 
 ## Usage
 
-`scripts/report_gen.py` is the main entry point and supports three modes — fully automatic (Stage 2 + 3), Stage 3 only (HTML already generated), and Stage 2 only (HTML generation only). Additional CLI commands are listed below, covering everything from project scaffolding to per-section generation.
+`scripts/report_gen.py` is the main entry point and supports three modes — fully automatic (Stage 2 + 3), Stage 3 only (HTML already generated), and Stage 2 only (HTML generation only). Additional CLI commands are listed below, covering everything from project scaffolding to per-section generation. **v1.4.0:** default output is DOCX; `--format` accepts `docx` (default) and `html`; `pdf` is silently dropped.
 
 ### Scenario 1: Full Auto (Stage 2 + 3)
 
-Best for "I have sources + lock, just give me the PDF + DOCX." All stages run, and any BLOCKING condition is intercepted before export.
+Best for "I have sources + lock, just give me the DOCX." All stages run, and any BLOCKING condition is intercepted before export.
 
 ```bash
 python -m scripts.report_gen \
@@ -229,9 +229,9 @@ python -m scripts.report_gen \
 4. Run `export_checker.py` 5-item DOCX acceptance.
 5. PASS → write `exports/report_<ts>.docx` (and `exports/report_<ts>.html` if `--format html,docx` was passed); FAIL → non-zero exit + reason.
 
-### Scenario 2: Stage 3 Only (HTML → PDF/DOCX)
+### Scenario 2: Stage 3 Only (HTML → DOCX / HTML)
 
-Best for "HTML is already generated (either from a one-off Stage 2 run, or hand-written) and I only want the PDF / DOCX."
+Best for "HTML is already generated (either from a one-off Stage 2 run, or hand-written) and I only want the DOCX (and optionally a named HTML file)."
 
 ```bash
 python -m scripts.report_gen render \
@@ -262,7 +262,7 @@ python -m scripts.report_gen generate \
 | `python -m scripts.executor --lock <path> --output <dir> [--section N]` | Launch the Executor for per-section generation |
 | `python -m scripts.config check` | Font + .env fail-fast check |
 | `python -m scripts.quality_checker <file.html>` | Run the quality gate against a single HTML file |
-| `python -m scripts.export_checker --pdf <path> --docx <path>` | post-export acceptance check |
+| `python -m scripts.export_checker --pdf <path> --docx <path>` | post-export acceptance check (`--pdf` deprecated in v1.4.0, silently ignored; use `--docx <path>` only) |
 | `python -m scripts.export_checker --docx <path>` (v1.4.0+) | post-export acceptance (DOCX-only, 5 checks); `--pdf` is deprecated and ignored |
 
 For the full CLI spec, parameter list, and exit-code semantics, see [`architecture.md`](architecture.md#介面定義).
@@ -323,11 +323,13 @@ Produce chapter_N.html; honour fonts / line-spacing / bold rules from examples/l
 Run quality_checker before delivery. FAIL is not deliverable.
 ```
 
-**Visual Reviewer** — Step 5 pre-flight (optional):
+**Visual Reviewer** — Step 5 pre-flight (optional, v1.4.0: opt-in only):
 ```
-Run python scripts/html_to_pdf → pdftoppm → sample 4 pages → visual model evaluation.
+Run python scripts/html_to_docx → soffice → pdftoppm on a temp render → sample 4 pages → visual model evaluation.
 Verify: 標楷體 + Times New Roman loaded, no column overflow, page numbers + TOC present, no truncation.
 FAIL routes back to Step 2 or Step 3. Do NOT touch prose in Step 5.
+Note: PDF render is only available via the legacy `html_to_pdf.py` module; v1.4.0 default
+DOCX output can still be visually evaluated by converting a copy via soffice for preview purposes.
 ```
 
 ### Tier C — Terminal-Only CLI (no LLM)
@@ -381,8 +383,7 @@ Report-master runs as a **5-step phase flow**, with each step mapping to one or 
 2. **Expand with Data** — Executor writes per-section HTML, with data sources explicitly pinned into the prompt (`chapter_N_research.md`).
 3. **Structure** — Outliner (`phase-3-outliner`) produces the Section Blueprint (`0_outline.md` + `0_outline_for_review.md`) before user confirmation.
 4. **User Confirmation** — explicit human-in-the-loop gate (`user-confirmation` workflow); writes `0_confirmed.json` before Executor starts.
-5. **Format** — mechanical PDF + DOCX export (`html_to_pdf` + `html_to_docx`); no content changes after this step.
-5. **Format (v1.4.0+)** — mechanical DOCX export (`html_to_docx`); HTML remains a user-accessible output via `--format html,docx`. PDF is no longer produced. No content changes after this step.
+5. **Format (v1.4.0+)** — mechanical DOCX export (`html_to_docx`); HTML remains a user-accessible output via `--format html,docx`. PDF is no longer produced by the orchestrator. No content changes after this step. (Pre-v1.4.0: PDF + DOCX dual export via `html_to_pdf` + `html_to_docx`; see Changelog v1.4.0 for migration.)
 
 **Feedback routing (Step 4 → which step to rewind):**
 
@@ -413,9 +414,6 @@ The pipeline is split into five stages, from "raw input in" to "deliverable out"
 │  Stage 2.5 — Iteration (optional, v1 → v2)                          │
 │    delta_checker.py diffs versions; select section IDs to re-run Stage 2 │
 ├──────────────────────────────────────────────────────────────────────┤
-│  Stage 3 — Engineering Conversion (PDF + DOCX in parallel)          │
-│    Parallel: weasyprint → PDF · pandoc → DOCX                       │
-│    export_checker.py post-export check                              │
 │  Stage 3 — Engineering Conversion (v1.4.0: DOCX-only)              │
 │    Primary: pandoc → DOCX                                           │
 │    Optional: emit named HTML via `--format html,docx`               │
@@ -604,6 +602,8 @@ These rules exist because we have hit the issues before — violating any of the
 | **v1.3** | ✅ 5-step phase flow + feedback routing (Plan / Expand / Structure / Confirm / Format) — see [Pipeline — 5-Step Phase Flow](#pipeline--5-step-phase-flow) |
 | **v1.3.1** | ✅ Issue #2 + #3 fix — table column widths + page-numbers / TOC CLI flags — see [Changelog](#changelog) |
 | **v1.3.2** | ✅ New `## Recommended Prompts` section — 4-tier prompt catalog (A: one-liner · B: sub-agent dispatch · C: terminal CLI · Bonus: system prompt prefix) — see [Recommended Prompts](#recommended-prompts) |
+| **v1.3.3** | ✅ D7 Section Opener Rule + integration test — see [Changelog](#changelog) |
+| **v1.4.0** | ✅ DOCX-only user-facing output (PDF removed from orchestrator; HTML preserved as intermediate + opt-in named output; export_checker 7→5 items) — **BREAKING** — see [Changelog](#changelog) |
 | **v2.0** | Stage 4 pipeline-as-service + multi-locale |
 
 ---
