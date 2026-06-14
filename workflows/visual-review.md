@@ -1,6 +1,6 @@
 ---
 name: visual-review
-description: Report-master 視覺自查 workflow. 在 Executor 生成 `report_output/section_N.html` 之後、使用者正式交付之前，做最後一輪視覺檢查：auto-check (quality_checker) → render (html_to_pdf) → visual-inspection (LLM 描述 PDF 快照) → 產出 `report_output/visual_review.md` 報告。支援單節 (`--html`) 與整批 (`--dir`) 模式，verbose flag 顯示完整報告。Use this as the final QA gate before delivering a report section to the user.
+description: "Report-master Step 5 optional (Visual QA). After Executor: auto-check, render PDF, LLM visual inspection, visual_review.md. Per-section or batch."
 version: 1.0
 ---
 

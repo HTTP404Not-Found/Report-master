@@ -1,6 +1,6 @@
 ---
 name: revise
-description: "Report-master Stage 2.5 revise workflow. Modify an already-generated section_N.html without touching the execution contract (report_lock.md). Use when the user wants to iterate on a specific section — e.g. '§3 第二段太長，壓縮一下' / '§2 結論改寫成 bullet 形式' / '§1 加一張示意圖說明'. Workflow: locate → revise (LLM/edit) → delta-check (lock unchanged) → quality-check → write back. Integrates scripts/revise_helper.py + scripts/delta_checker.py + scripts/quality_checker.py. Use this when iterating on existing HTML output without restarting Stage 2."
+description: Report-master Step 4 inline (Revise). Edit section_N.html without touching report_lock.md. locate -> revise -> delta-check -> quality-check -> write back.
 version: 1.0
 ---
 

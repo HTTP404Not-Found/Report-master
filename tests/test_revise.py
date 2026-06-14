@@ -59,7 +59,7 @@ def test_workflow_md_frontmatter_loads():
     fm = yaml.safe_load(parts[1])
 
     assert fm["name"] == "revise"
-    assert "Stage 2.5" in fm["description"]
+    assert "Step 4" in fm["description"]  # v1.3: Stage 2.5 renamed to Step 4 inline
     assert str(fm["version"]) == "1.0"  # YAML 把 "1.0" parse 為 float
 
 

@@ -1,6 +1,6 @@
 ---
 name: topic-research
-description: Report-master no-source workflow. Starts from a bare topic (no PDF/DOCX/URL), runs LLM-driven preliminary research to produce sub-questions + outline, then optionally runs Content Expansion via web_search to enrich individual sections with real-world data, and finally feeds into Strategist + Executor. Use when the user has only a topic and no source materials, or when sections need live web evidence.
+description: Report-master Step 1 high-level + Step 2 Content Expansion. Bare topic -> sub-questions + outline + optional per-section web_search. Feeds Strategist+Executor.
 version: "1.1"
 ---
 

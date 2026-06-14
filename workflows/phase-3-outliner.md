@@ -1,6 +1,6 @@
 ---
 name: phase-3-outliner
-description: Report-master Stage 1.5 獨立 workflow。把 Strategist 收斂出的 RQ1…RQn (research questions) 規劃成一份可被 Executor 直接消費的「章節藍圖」(Section Blueprint)，產出 0_outline.md + 0_outline_for_review.md。讀 RQs → 規劃章節 → 邏輯順序檢查 → 產 outline。Use when Strategist 完成 10 Confirmations 並產出 0_strategist.md 後，要進入 User Confirmation 之前。
+description: Report-master Step 3 (Structure). Takes Strategist RQ1..RQn -> emits 0_outline.md + 0_outline_for_review.md. Runs between Strategist and User Confirmation.
 version: "1.0"
 ---
 

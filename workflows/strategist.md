@@ -1,6 +1,6 @@
 ---
 name: strategist
-description: Report-master Stage 1 user-facing workflow. Converges user intent via 10 Confirmations, then DELEGATES chapter blueprinting to phase-3-outliner (Stage 1.5), then PAUSES for user confirmation, then emits report_lock.md. Refuses to enter Stage 2 until user OK. Use as the entry point when starting a new report from scratch or from a single topic.
+description: Report-master Step 1 (Plan+Research). 10 Confirmations converge intent -> delegate to outliner -> pause for OK -> emit report_lock.md. New-report entry point.
 version: "1.2"
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: user-confirmation
-description: Report-master user confirmation gate. After Strategist produces the Section Blueprint (0_outline.md), generates 0_outline_for_review.md and PAUSES the pipeline. Executor must read 0_confirmed.json before starting; refuses to start if file missing or executor_can_start=false. Use this as the explicit "human-in-the-loop" check between Stage 1 and Stage 2.
+description: Report-master Step 4 (User Confirmation + Feedback Routing). Emits 0_outline_for_review.md, pauses. Executor needs 0_confirmed.json. Routes feedback.
 version: "1.0"
 ---
 

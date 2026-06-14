@@ -1,6 +1,6 @@
 ---
 name: executor
-description: Report-master Stage 2 Executor role + per-section workflow. Consumes Strategist's report_lock.md + report_spec.md + glossary.md + phase-3-outliner's 0_outline.md and emits one section_N.html at a time. Per-section quality gate (BLOCKING on quality_checker failure). Reads lock every section to absorb mid-run edits (anti-drift).
+description: Report-master Step 2 (Expand with Data). Reads report_lock.md + 0_outline.md -> per-section HTML (section_N.html) with quality gate. Re-reads lock each section.
 version: "1.1"
 ---
 
