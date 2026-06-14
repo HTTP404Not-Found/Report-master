@@ -408,8 +408,8 @@ def main() -> int:
     # ── Phase C: post-export validation ──
     try:
         from scripts.export_checker import check_export
-        rep = check_export(pdf_path=None, docx_path=str(out_docx),
-                           require_pdf=False, require_docx=True)
+        rep = check_export(docx_path=str(out_docx),
+                           require_docx=True)
         if rep.docx_report:
             pc = rep.docx_report.get("paragraph_count", "?")
             print(f"[export_checker] DOCX paragraphs={pc}, PASS={rep.passed}")

@@ -1,12 +1,12 @@
 # Report-master
 
-> **AI 驅動的專業報告書生成系統。** 從 Markdown / HTML / PDF / DOCX / URL 來源,自動產出 **PDF + DOCX 雙交付物**,並透過 `report_lock.md` 防漂移機制,保證長篇報告的排版與敘事一致性。
+> **AI 驅動的專業報告書生成系統。** 從 Markdown / HTML / PDF / DOCX / URL 來源,自動產出 **DOCX** 作為 user-facing 主交付物,並透過 `report_lock.md` 防漂移機制,保證長篇報告的排版與敘事一致性。**v1.4.0 — DOCX-only 交付物**;HTML 為內部 intermediate(也可用 `--format html,docx` 顯式產出);PDF 不再由 orchestrator 產出(`html_to_pdf.py` 模組保留供 legacy opt-in)。
 
 [![GitHub](https://img.shields.io/badge/github-HTTP404Not--Found%2FReport--master-blue?logo=github)](https://github.com/HTTP404Not-Found/Report-master)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python)](https://www.python.org/)
 [![Pipeline](https://img.shields.io/badge/pipeline-Stage%200%20%E2%86%92%203-success)](#-三階段流程--pipeline-stages)
 [![Progress](https://img.shields.io/badge/progress-40%2F40%20%2B%206%2F6%20TR--2%20(100%25)-success)](#-開發進度--progress)
-[![Tests](https://img.shields.io/badge/tests-444%2F446%20pass-brightgreen)](#-測試--testing)
+[![Tests](https://img.shields.io/badge/tests-429%2F431%20pass-brightgreen)](#-測試--testing)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 > 英文版請見 [`README.md`](README.md)。
@@ -32,9 +32,9 @@
 
 ## 這是什麼 / About
 
-**Report-master** 是一個以 AI 為核心的**專業報告書生成系統**。它以 **HTML 作為 AI 內容生成與工程轉換的中間格式**,透過 weasyprint (HTML → PDF) 與 pandoc (HTML → DOCX) 兩條獨立路徑,產出 **PDF + DOCX 雙交付物**,並用 `report_lock.md`(17 個 required 欄位的 YAML schema)作為機器可執行的排版合同,從根本上防止長篇報告的格式漂移與敘事漂移。
+**Report-master** 是一個以 AI 為核心的**專業報告書生成系統**。它以 **HTML 作為 AI 內容生成與工程轉換的內部中間格式**,透過單一 pandoc (HTML → DOCX) 路徑,產出 **DOCX user-facing 主交付物**(v1.4.0 起;PDF 路徑已退役)。HTML 也可由 `--format html,docx` 顯式產出供使用者取用。並用 `report_lock.md`(17 個 required 欄位的 YAML schema)作為機器可執行的排版合同,從根本上防止長篇報告的格式漂移與敘事漂移。
 
-本系統的設計靈感來自同作者的 `ppt-master` 系列(投影片生成系統),把輸出從 PPTX 換成 PDF + DOCX,並補上**目次 / 章節編號 / 註腳 / 交叉引用 / 參考文獻**等正式文件必備元素。一句話總結:**給它 lock + glossary + 章節大綱,它會逐節產出 HTML,然後平行吐出 PDF 與 DOCX。**
+本系統的設計靈感來自同作者的 `ppt-master` 系列(投影片生成系統),把輸出從 PPTX 換成 DOCX(HTML 為一級 pipeline intermediate),並補上**目次 / 章節編號 / 註腳 / 交叉引用 / 參考文獻**等正式文件必備元素。一句話總結:**給它 lock + glossary + 章節大綱,它會逐節產出 HTML,然後吐出一份 DOCX 作為 user-facing 交付物。**
 
 ### 與 ppt-master 的關鍵差異 / Key Differences vs. ppt-master
 
@@ -42,8 +42,8 @@
 
 | 維度 | ppt-master | Report-master |
 |------|-----------|---------------|
-| 輸出格式 | PPTX(單一) | **PDF + DOCX(雙交付物)** |
-| 中間格式 | SVG | **HTML**(block flow 對 PDF/DOCX 更友善) |
+| 輸出格式 | PPTX(單一) | **DOCX**(v1.4.0+ user-facing;HTML 為 pipeline 中間格式 + opt-in 命名產出;PDF 模組保留但不預設呼叫) |
+| 中間格式 | SVG | **HTML**(block flow 對 DOCX 更友善) |
 | AI 生成單位 | 每頁 SVG | **每節 HTML**(逐節 + per-section quality gate) |
 | 結構 | 投影片 | **章節(封面 → 目次 → 正文 → 參考文獻)** |
 | 編號 | 投影片 # | **章節 / 圖表 / 公式編號** |
@@ -66,16 +66,17 @@
 - **`glossary.md`** — 術語表範本,防止長篇報告在多節生成中出現「敘事漂移」(同一個概念用兩個名稱)。
 - **字體策略** — `fonts/` 為 bundle 目錄,`config.py` 啟動時 fail-fast 檢查標楷體 + Times New Roman 是否可用,缺一不可。
 
-### Phase 1 ✅ MVP — PDF 路徑 / PDF Path (100%)
+### Phase 1 ✅ MVP — DOCX 路徑 / DOCX Path (100%;legacy PDF 路徑於 v1.4.0 退役)
 
 - `config.py` — `.env` 加載鏈 + 字體 fail-fast 檢查。
 - `project_manager.py` — 一鍵建立目錄結構 + 產出 `report_lock.md` 模板。
 - `source_to_md/` — PDF / DOCX / URL → Markdown 統一管線(Stage 0 入口)。
 - `html_to_pdf.py` — weasyprint 渲染,字體嵌入驗證,保證 PDF 可離線閱讀。
+ - `html_to_pdf.py` — weasyprint 渲染,字體嵌入驗證,保證 PDF 可離線閱讀。**(v1.4.0: legacy;不預設呼叫。模組保留供日後 opt-in 使用。)**
 - `quality_checker.py` — 基礎版門禁(HTML 語法 + 字體 + 禁用 CSS 清單)。
 - `report_gen.py` Phase 1 整合 — 一鍵 PDF 產出。
 
-### Phase 2 ✅ 雙格式 PDF + DOCX / Dual Format PDF + DOCX (89%)
+### Phase 2 ✅ DOCX 為主;PDF 路徑 legacy(89% → v1.4.0 起 DOCX-only)
 
 - `html_to_docx.py` — pandoc + reference docx 路徑,把 HTML 轉成結構穩定的 Word。
 - `templates/reference/report-master-template.docx` — 預載字體樣式(CJK=標楷體 / Latin=Times New Roman),Word 開檔零設定。
@@ -84,7 +85,7 @@
 - `footnote_manager.py` — pandoc 原生 `^[note]` 語法 + CSL 引用管理。
 - `mermaid_renderer.py` — mermaid-cli 預渲染 SVG(避免 weasyprint 沒有 JS 引擎而靜默失敗)。
 - `katex_renderer.py` — katex-cli 預渲染數學公式 PNG(同樣原因)。
-- `report_gen.py` Phase 2 整合 — **PDF + DOCX 平行產出**。
+ - `report_gen.py` Phase 2 整合 — **DOCX 產出 (HTML 為中間格式)**。(v1.4.0:PDF 平行產出退役;`--format pdf,docx` 仍可傳入但 PDF 項目會被靜默忽略。)
 - 🚧 `html_to_docx_direct.py` — python-docx 平行路徑(預設關閉,適合政府公文 / 學術投稿等格式極敏感場景)。
 
 ### Phase 3 ✅ 完整 Workflow / Complete Workflow (100%)
@@ -124,6 +125,7 @@ pip install -r scripts/requirements.txt
 # Ubuntu/Debian
 sudo apt install pandoc libpango-1.0-0 libpangoft2-1.0-0
 # weasyprint 完整依賴見 https://doc.weasyprint.org/en/stable/install.html
+# (v1.4.0: pandoc 為必要;weasyprint 為 optional/legacy — 只在你想透過 `scripts/html_to_pdf.py` opt-in 重新啟用 PDF 路徑時才需要。)
 
 # 4. 跑 example(產出 PDF + DOCX 到 /tmp/rm-test)
 python -m scripts.report_gen \
@@ -132,13 +134,13 @@ python -m scripts.report_gen \
   --lock examples/lock.md
 
 # 預期產出:
-#   /tmp/rm-test/_bundle.html           (HTML bundle)
-#   /tmp/rm-test/report_<timestamp>.pdf
+#   /tmp/rm-test/_bundle.html           (HTML intermediate,內部)
 #   /tmp/rm-test/report_<timestamp>.docx
+#   (v1.4.0: PDF 不再產出;若要加 HTML 命名檔,傳 `--format docx,html`。)
 ls /tmp/rm-test
 ```
 
-> **預期結果**:exit code = 0,目錄下同時看到 `.pdf` 與 `.docx` 兩個檔案,且 `export_checker.py` 全綠(頁數 > 0、字體已嵌入、目次連結有效)。
+> **預期結果**:exit code = 0,目錄下看到 `.docx` 檔案,且 `export_checker.py` 全綠(5 項 DOCX 檢查:DOCX 可開啟、`[Content_Types].xml` 存在、`word/document.xml` 存在且至少 1 段、ZIP 完整性、DOCX TOC field 有效)。v1.4.0 起不再產出 PDF。
 
 ---
 
@@ -222,9 +224,9 @@ python -m scripts.report_gen \
 
 1. 讀 `report_lock.md` → 校驗 17 個 required 欄位(缺 → BLOCKING)。
 2. 對每節 HTML 跑 `quality_checker.py`。
-3. **平行**跑 `html_to_pdf.py` 與 `html_to_docx.py`。
-4. 跑 `export_checker.py` 驗收。
-5. PASS → 寫入 `exports/report_<ts>.{pdf,docx}`;FAIL → 非零退出 + reason。
+3. (v1.4.0) 跑 `html_to_docx.py`(預設;PDF 不再預設產出;HTML 命名輸出只在顯式 `--format html` 時才產生)。
+4. 跑 `export_checker.py` 5 項 DOCX-only 驗收。
+5. PASS → 寫入 `exports/report_<ts>.docx`(以及 opt-in 的 `exports/report_<ts>.html`);FAIL → 非零退出 + reason。
 
 ### 情境 2:只跑 Stage 3 / Scenario 2: Stage 3 Only (HTML → PDF/DOCX)
 
@@ -234,8 +236,10 @@ python -m scripts.report_gen \
 python -m scripts.report_gen render \
   --html <bundle.html> \
   --output <exports_dir> \
-  --format pdf,docx
+  --format docx            # 預設;或 --format docx,html 加上 HTML 命名輸出
 ```
+
+> **v1.4.0 迁移提示**: 舊的 `--format pdf,docx` flag 仍可傳入,但非 docx/html 項目會被靜默忽略。
 
 ### 情境 3:只跑 Stage 2 / Scenario 3: Stage 2 Only (HTML Generation)
 
@@ -258,6 +262,7 @@ python -m scripts.report_gen generate \
 | `python -m scripts.config check` | 字體 + .env fail-fast 檢查 |
 | `python -m scripts.quality_checker <file.html>` | 對單一 HTML 跑質量門禁 |
 | `python -m scripts.export_checker --pdf <path> --docx <path>` | post-export 驗收 |
+| `python -m scripts.export_checker --docx <path>` (v1.4.0+) | post-export 驗收 (DOCX-only, 5 項);`--pdf` 為 deprecated 並忽略 |
 
 完整 CLI 規格、參數清單、退出碼語義請見 [`architecture.md`](architecture.md#介面定義)。
 
@@ -269,7 +274,7 @@ python -m scripts.report_gen generate \
 
 ### Tier A — 一鍵觸發(貼到任何 LLM 對話框)
 
-給終端使用者:讓 agent 自行駕馭整個 **5 步驟 phase flow**。
+(v1.4.0+: user-facing 為 DOCX;下列 prompt 以 DOCX 為最終交付物。PDF 不再由 orchestrator 產出。)
 
 ```
 用 Report-master 跑 5 步驟 phase flow 幫我做報告。
@@ -335,9 +340,10 @@ cd /home/ubuntu/.openclaw/workspace/projects/report-master
 python scripts/build_spec_docx.py --page-numbers --toc
 
 # 2) 主 pipeline orchestrator(3 種模式,看 SKILL.md §3)
-python -m scripts.report_gen --source <input> --output exports/ --lock examples/lock.md       # 全自動
-python -m scripts.report_gen render --html bundle.html --output exports/ --format pdf,docx  # 只 Stage 3
-python -m scripts.report_gen generate --lock examples/lock.md --output report_output/        # 只 Stage 2
+python -m scripts.report_gen --source <input> --output exports/ --lock examples/lock.md              # 全自動 (DOCX)
+python -m scripts.report_gen render --html bundle.html --output exports/ --format docx,html         # 只 Stage 3 (DOCX + 命名 HTML)
+python -m scripts.report_gen generate --lock examples/lock.md --output report_output/               # 只 Stage 2
+python -m scripts.report_gen render --html bundle.html --output exports/ --format docx              # 只 Stage 3, DOCX-only
 
 # 3) 跑回歸測試
 .venv/bin/python -m pytest tests/ -q
@@ -375,6 +381,7 @@ python -m scripts.report_gen generate --lock examples/lock.md --output report_ou
 3. **編排內容** — Outliner (`phase-3-outliner`) 在使用者確認前產出 Section Blueprint (`0_outline.md` + `0_outline_for_review.md`)。
 4. **用戶確認** — 明確的 human-in-the-loop gate (`user-confirmation` workflow);在 Executor 啟動前寫入 `0_confirmed.json`。
 5. **最後編排格式** — 純機械的 PDF + DOCX 輸出 (`html_to_pdf` + `html_to_docx`);本步驟之後不再改內容。
+5. **最後編排格式 (v1.4.0+)** — 純機械的 DOCX 輸出 (`html_to_docx`);HTML 仍可由 `--format html,docx` 顯式產出供使用者取用。PDF 不再產出。本步驟之後不再改內容。
 
 **Feedback routing(步驟 4 → 退回哪一步)**:
 
@@ -407,6 +414,10 @@ python -m scripts.report_gen generate --lock examples/lock.md --output report_ou
 │  Stage 3 — 工程轉換(PDF + DOCX 平行)                                │
 │    平行:weasyprint → PDF · pandoc → DOCX                           │
 │    export_checker.py post-export 檢查                               │
+│  Stage 3 — 工程轉換(v1.4.0:DOCX-only)                              │
+│    主路徑:pandoc → DOCX                                            │
+│    選用:透過 `--format html,docx` 產出命名 HTML                      │
+│    export_checker.py post-export 檢查 (5 項 DOCX-only)              │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 

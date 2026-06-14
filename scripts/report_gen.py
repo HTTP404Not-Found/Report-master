@@ -1,10 +1,17 @@
 # report_gen.py — Report-master 主 pipeline orchestrator
 # 對應 SPEC.md §2.3 Pipeline + SKILL.md §3 呼叫協議
-# 串接：load lock → Stage 2 逐節 HTML 生成 → quality_checker 過門 → Stage 3 平行轉換 → export_checker 驗收
+# 串接：load lock → Stage 2 逐節 HTML 生成 → quality_checker 過門 → Stage 3 DOCX 轉換 → export_checker 驗收
 #
-# 三種 CLI 模式：
+# v1.4.0 重大變更（PDF user-facing 退役）:
+#   - --format 移除 pdf 支援；保留 docx (預設) + html (opt-in named output)
+#   - Stage 3: 移除 html_to_pdf 平行路徑；保留 html_to_docx 單跑
+#   - --format pdf,docx 仍可傳入但 PDF 項目被靜默忽略（backward compat）
+#   - --format docx,html 顯式產 HTML 命名輸出 (供使用者取用)
+#   - scripts/html_to_pdf.py 模組保留供 legacy opt-in（不預設呼叫）
+#
+# 三種 CLI 模式:
 #   1. 全自動（Stage 2 + 3）：  python -m scripts.report_gen --source X --output Y --lock Z
-#   2. 只跑 Stage 3（已生成 HTML）：report_gen render --html X --output Y [--format pdf,docx]
+#   2. 只跑 Stage 3（已生成 HTML）：report_gen render --html X --output Y [--format docx,html]
 #   3. 只跑 Stage 2（生成 HTML）：  report_gen generate --lock X --output Y
 
 from __future__ import annotations
@@ -19,7 +26,6 @@ from pathlib import Path
 from typing import List, Dict, Optional, Union
 
 from scripts.quality_checker import check_html, scan_html, QualityCheckError
-from scripts.html_to_pdf import html_to_pdf, HTMLToPDFError
 from scripts.html_to_docx import html_to_docx, HTMLToDOCXError
 from scripts.export_checker import check_export
 from scripts.docx_validator import validate_docx, DOCXValidationError
@@ -36,6 +42,51 @@ except ImportError:
     _HAS_REPORT_LOCK = False
 
 logger = logging.getLogger(__name__)
+
+
+# ────────────────────────────────────────────────────────────────────
+# Format normalization (v1.4.0: PDF silent-ignore for backward compat)
+# ────────────────────────────────────────────────────────────────────
+
+# v1.4.0: user-facing formats. PDF is silently filtered out (no warning by
+# default to keep CI logs clean; legacy `--format pdf,docx` still works).
+SUPPORTED_FORMATS = ("docx", "html")
+DEPRECATED_FORMATS = ("pdf",)  # silently dropped; not in SUPPORTED_FORMATS
+
+
+def _normalize_formats(raw: Optional[Union[str, List[str]]]) -> List[str]:
+    """Normalize --format input into a clean list of supported formats.
+
+    Behavior:
+      - "pdf,docx" → ["docx"]          (PDF silently dropped, backward compat)
+      - "docx,html" → ["docx", "html"] (explicit HTML opt-in named output)
+      - "pdf"      → []                (no-op, log info)
+      - "docx"     → ["docx"]          (default)
+      - None       → ["docx"]          (default)
+
+    Whitespace tolerated. Duplicates removed (order preserved).
+    """
+    if raw is None:
+        return ["docx"]
+
+    if isinstance(raw, str):
+        parts = [p.strip().lower() for p in raw.split(",") if p.strip()]
+    else:
+        parts = [str(p).strip().lower() for p in raw if str(p).strip()]
+
+    out: List[str] = []
+    for p in parts:
+        if p in DEPRECATED_FORMATS:
+            # v1.4.0: silent ignore for backward compat
+            logger.info("--format=%s 已退役 (v1.4.0)；靜默忽略此項", p)
+            continue
+        if p in SUPPORTED_FORMATS and p not in out:
+            out.append(p)
+
+    if not out:
+        # If caller passed only deprecated formats, fall back to default.
+        return ["docx"]
+    return out
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -237,15 +288,15 @@ def _stage2_quality_gate(html_paths: List[Path]) -> Dict[str, dict]:
 
 
 # ────────────────────────────────────────────────────────────────────
-# Stage 3 — Parallel render
+# Stage 3 — DOCX render (v1.4.0: PDF user-facing 退役;DOCX 為主;HTML 為 opt-in named output)
 # ────────────────────────────────────────────────────────────────────
 
 @dataclass
 class Stage3Result:
-    pdf: Optional[Path] = None
     docx: Optional[Path] = None
-    pdf_error: Optional[str] = None
+    html: Optional[Path] = None  # opt-in named output (when --format docx,html)
     docx_error: Optional[str] = None
+    html_error: Optional[str] = None
 
 
 def _stage3_render(
@@ -254,24 +305,21 @@ def _stage3_render(
     formats: List[str],
     lock: dict,
 ) -> Stage3Result:
-    """Stage 3: render PDF + DOCX in parallel-ish (sequential here for simplicity).
+    """Stage 3: render DOCX + (optional) named HTML.
+
+    v1.4.0:
+      - DOCX is the primary user-facing deliverable (always when 'docx' in formats).
+      - HTML is preserved as pipeline intermediate; also available as
+        opt-in named output via `--format docx,html`.
+      - PDF user-facing path removed (html_to_pdf module preserved for legacy opt-in).
 
     Returns Stage3Result with paths and any per-format errors.
     """
     result = Stage3Result()
     output_dir.mkdir(parents=True, exist_ok=True)
     timestamp = time.strftime("%Y%m%d_%H%M%S")
-    pdf_path = output_dir / f"report_{timestamp}.pdf"
     docx_path = output_dir / f"report_{timestamp}.docx"
-
-    if "pdf" in formats:
-        try:
-            html_to_pdf(bundle_html, pdf_path)
-            result.pdf = pdf_path
-            logger.info("✅ PDF: %s", pdf_path)
-        except HTMLToPDFError as e:
-            result.pdf_error = str(e)
-            logger.error("❌ PDF failed: %s", e)
+    html_path = output_dir / f"report_{timestamp}.html"
 
     if "docx" in formats:
         try:
@@ -281,6 +329,18 @@ def _stage3_render(
         except HTMLToDOCXError as e:
             result.docx_error = str(e)
             logger.error("❌ DOCX failed: %s", e)
+
+    if "html" in formats:
+        # Copy bundle to a timestamped named output. This is the
+        # "opt-in HTML" output for users who want the intermediate HTML
+        # alongside the DOCX deliverable.
+        try:
+            shutil.copy2(str(bundle_html), str(html_path))
+            result.html = html_path
+            logger.info("✅ HTML (named output): %s", html_path)
+        except Exception as e:
+            result.html_error = str(e)
+            logger.error("❌ HTML copy failed: %s", e)
 
     return result
 
@@ -297,8 +357,8 @@ class GenerateReportResult:
     output_dir: str
     bundle_html: Optional[str] = None
     stage2_quality: Dict[str, dict] = field(default_factory=dict)
-    pdf: Optional[str] = None
     docx: Optional[str] = None
+    html: Optional[str] = None
     export_check: Dict = field(default_factory=dict)
     errors: List[str] = field(default_factory=list)
     timestamp: str = ""
@@ -319,15 +379,20 @@ def generate_report(
 
     Args:
         source_dir: directory containing per-section *.html (or single .html file).
-        output_dir: where to write report_{ts}.pdf / report_{ts}.docx.
+        output_dir: where to write report_{ts}.docx (and report_{ts}.html if requested).
         lock_path: path to report_lock.md.
-        formats: subset of ['pdf', 'docx']; default both.
+        formats: subset of ['docx', 'html']; default ['docx'].
+                Legacy 'pdf' is silently dropped (backward compat, v1.4.0).
         skip_quality_gate: DANGEROUS — skip HTML quality check (debug only).
         run_docx_validation: also run docx_validator after DOCX render.
 
     Returns: GenerateReportResult.
+
+    v1.4.0 notes:
+      - Default formats = ['docx']. PDF no longer produced by orchestrator.
+      - Use --format docx,html to also get a named HTML output alongside DOCX.
     """
-    formats = formats or ["pdf", "docx"]
+    formats = _normalize_formats(formats)
     src = Path(source_dir)
     out = Path(output_dir)
     lock_p = Path(lock_path)
@@ -371,23 +436,22 @@ def generate_report(
         result.errors.append(f"[BUNDLE] {e}")
         return result
 
-    # ── Stage 3: render ──
+    # ── Stage 3: render (DOCX + optional named HTML) ──
     stage3 = _stage3_render(bundle_path, out, formats, lock)
-    if stage3.pdf:
-        result.pdf = str(stage3.pdf)
-    else:
-        result.passed = False
-        if stage3.pdf_error:
-            result.errors.append(f"[PDF] {stage3.pdf_error}")
     if stage3.docx:
         result.docx = str(stage3.docx)
     else:
         result.passed = False
         if stage3.docx_error:
             result.errors.append(f"[DOCX] {stage3.docx_error}")
+    if stage3.html:
+        result.html = str(stage3.html)
+    else:
+        if stage3.html_error:
+            result.errors.append(f"[HTML] {stage3.html_error}")
 
     # ── DOCX validation (optional) ──
-    if run_docx_validation and stage3.docx and formats and "docx" in formats:
+    if run_docx_validation and stage3.docx and "docx" in formats:
         try:
             docx_rep = validate_docx(stage3.docx)
             if not docx_rep.passed:
@@ -397,10 +461,9 @@ def generate_report(
         except Exception as e:
             result.errors.append(f"[DOCX_VALIDATE] (non-fatal): {e}")
 
-    # ── Export check ──
-    pdf_p = Path(stage3.pdf) if stage3.pdf else None
+    # ── Export check (DOCX-only, v1.4.0) ──
     docx_p = Path(stage3.docx) if stage3.docx else None
-    export_rep = check_export(pdf_p, docx_p, require_pdf=("pdf" in formats), require_docx=("docx" in formats))
+    export_rep = check_export(docx_p, require_docx=("docx" in formats))
     result.export_check = export_rep.to_dict()
     if not export_rep.passed:
         result.passed = False
@@ -444,7 +507,7 @@ def _cmd_generate(args) -> int:
 
 
 def _cmd_render(args) -> int:
-    """Stage 3 only: bundle → PDF/DOCX."""
+    """Stage 3 only: bundle → DOCX (+ optional named HTML)."""
     html_p = Path(args.html)
     out = Path(args.output)
     lock_p = Path(args.lock) if args.lock else None
@@ -456,21 +519,21 @@ def _cmd_render(args) -> int:
             print(f"❌ {e}", file=sys.stderr)
             return 2
 
-    formats = [f.strip() for f in args.format.split(",")] if args.format else ["pdf", "docx"]
+    formats = _normalize_formats(args.format)
     stage3 = _stage3_render(html_p, out, formats, lock)
 
     exit_code = 0
-    if "pdf" in formats:
-        if stage3.pdf:
-            print(f"✅ PDF: {stage3.pdf}")
-        else:
-            print(f"❌ PDF: {stage3.pdf_error}", file=sys.stderr)
-            exit_code = 1
     if "docx" in formats:
         if stage3.docx:
             print(f"✅ DOCX: {stage3.docx}")
         else:
             print(f"❌ DOCX: {stage3.docx_error}", file=sys.stderr)
+            exit_code = 1
+    if "html" in formats:
+        if stage3.html:
+            print(f"✅ HTML: {stage3.html}")
+        else:
+            print(f"❌ HTML: {stage3.html_error}", file=sys.stderr)
             exit_code = 1
     return exit_code
 
@@ -481,7 +544,7 @@ def _cmd_full(args) -> int:
         source_dir=args.source,
         output_dir=args.output,
         lock_path=args.lock,
-        formats=[f.strip() for f in args.format.split(",")] if args.format else None,
+        formats=_normalize_formats(args.format),
         skip_quality_gate=args.skip_quality_gate,
         run_docx_validation=not args.no_docx_validation,
     )
@@ -491,10 +554,10 @@ def _cmd_full(args) -> int:
     print(f"  passed: {result.passed}")
     if result.bundle_html:
         print(f"  bundle: {result.bundle_html}")
-    if result.pdf:
-        print(f"  PDF:    {result.pdf}")
     if result.docx:
         print(f"  DOCX:   {result.docx}")
+    if result.html:
+        print(f"  HTML:   {result.html}")
     if result.errors:
         print(f"  errors:")
         for e in result.errors:
@@ -506,7 +569,12 @@ def _cmd_full(args) -> int:
 def _build_arg_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         prog="report-master",
-        description="Report-master pipeline (Stage 2 + 3)",
+        description=(
+            "Report-master pipeline (Stage 2 + 3). "
+            "v1.4.0: DOCX is the primary user-facing deliverable; "
+            "HTML is pipeline intermediate + opt-in named output; "
+            "PDF user-facing output removed."
+        ),
     )
     sub = ap.add_subparsers(dest="subcommand")
 
@@ -515,7 +583,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     p_full.add_argument("--source", required=True, help="Source HTML dir or file")
     p_full.add_argument("--output", required=True, help="Output directory")
     p_full.add_argument("--lock", required=True, help="report_lock.md path")
-    p_full.add_argument("--format", default="pdf,docx", help="Comma-separated: pdf,docx")
+    p_full.add_argument(
+        "--format",
+        default="docx",
+        help=(
+            "Comma-separated output formats. v1.4.0 supports: docx, html. "
+            "Default: docx. 'pdf' is silently ignored (backward compat)."
+        ),
+    )
     p_full.add_argument("--skip-quality-gate", action="store_true")
     p_full.add_argument("--no-docx-validation", action="store_true")
     p_full.set_defaults(func=_cmd_full)
@@ -528,18 +603,26 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     p_gen.set_defaults(func=_cmd_generate)
 
     # Render
-    p_ren = sub.add_parser("render", help="Stage 3 only (bundle → PDF/DOCX)")
+    p_ren = sub.add_parser("render", help="Stage 3 only (bundle → DOCX [+ optional HTML])")
     p_ren.add_argument("--html", required=True)
     p_ren.add_argument("--output", required=True)
     p_ren.add_argument("--lock", default=None)
-    p_ren.add_argument("--format", default="pdf,docx")
+    p_ren.add_argument(
+        "--format",
+        default="docx",
+        help="Comma-separated output formats. v1.4.0 supports: docx, html. Default: docx.",
+    )
     p_ren.set_defaults(func=_cmd_render)
 
     # Default (no subcommand) — full mode
     ap.add_argument("--source", help="Source HTML dir or file")
     ap.add_argument("--output", help="Output directory")
     ap.add_argument("--lock", help="report_lock.md path")
-    ap.add_argument("--format", default="pdf,docx")
+    ap.add_argument(
+        "--format",
+        default="docx",
+        help="Comma-separated output formats. v1.4.0 supports: docx, html. Default: docx.",
+    )
     ap.add_argument("--skip-quality-gate", action="store_true")
     ap.add_argument("--no-docx-validation", action="store_true")
 

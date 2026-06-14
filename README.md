@@ -730,7 +730,7 @@ Below are the in-project documents (in recommended reading order) and external r
 ---
 
 <p align="center">
-  <sub>Report-master v1.3.3 — Section Opener Rule + integration test (D7) · 40/40 + 6/6 TR-2 (100%) · 2026-06-14</sub><br>
+  <sub>Report-master v1.4.0 — DOCX-only user-facing output (PDF removed; HTML preserved as pipeline intermediate + opt-in named output) · 40/40 (100%) · 2026-06-14</sub><br>
   <sub>Built with 🐍 Python · 🧱 HTML intermediate · 📄 weasyprint · 📝 pandoc</sub>
   <sub>This is the English primary README · For the Chinese version, see <a href="README_zh.md">README_zh.md</a></sub>
 </p>
