@@ -605,6 +605,18 @@ python -m scripts.report_gen \
 
 ## 更新日誌 / Changelog
 
+### v1.4.0 — 2026-06-14(DOCX-only user-facing output)
+
+> **BREAKING**:User-facing output 不再包含 PDF。DOCX 為 user-facing 主交付物。HTML 為 pipeline intermediate(Stage 2 → 3)且可由 `--format html,docx` 顯式產出。
+
+- **feat!(report_gen)**:`report_gen.py` `--format` flag 接受 `docx`(預設)跟 `html`;`pdf` 靜默忽略。`Stage3Result.pdf` 欄位移除。`_stage3_render` 不再 import / 呼叫 `html_to_pdf`。`html_to_pdf.py` 模組保留(不刪)供未來 opt-in 重新啟用。
+- **feat!(export_checker)**:7 項 → 5 項。移除:PDF 可開啟 / PDF 字體嵌入 / PDF 頁數 > 0。保留(DOCX 5 項):可開啟 / `[Content_Types].xml` / `word/document.xml` + ≥ 1 段 / ZIP 完整性 / DOCX TOC field 有效。`--pdf` 跟 `--require-pdf` CLI flag 保留為 deprecated no-op 給 caller 向下相容。
+- **feat(skill)**:SKILL.md frontmatter description + v1.4.0 變更 banner;§2.0 5 步驟表更新;§2.2 對應更新;§3.1 / §3.2 / §3.3 呼叫協議更新;§5 `visual-review` row 註解;§6 Strategist「does NOT」註解;§8 vs ppt-master 表更新;§9 checklist 7→5 含 deprecation 註解;§10 `ExportCheckFailed: page count=0` 標 legacy;§11 版本表 + footer bump 到 v1.4.0。
+- **docs(report-master)**:README.md + README_zh.md 雙語同步 per AGENTS.md #9 — Usage 3 模式 + Tier A/C prompts、Quick Start、Pipeline Stage 3、Architecture Mermaid、Progress table、Changelog v1.4.0 row、version footer、test badge (429/431)。
+- **out of scope**:SPEC.md(未動 — 需 wai 顯式決策;建議改動列在 commit body)、`projects/dashboard-final/` 歷史產物、`examples/` PDF 範例、`references/`、`workflows/`(D7 sub-agent 範圍)、`build_spec_docx.py`(已 DOCX-only)、intermediate HTML 路徑(`exports/_intermediate_*.html`、`report_output/section_*.html`、`report_output/_bundle.html`)。
+
+**Migration**:既有 `--format pdf,docx` 用戶改為移除 flag(預設 docx)或用 `--format html,docx`(若需 HTML 命名輸出)。`html_to_pdf.py` 模組仍可 import 供 ad-hoc PDF 產出。
+
 ### v1.4.1 — 2026-06-15(PDF 殘留清理 — deprecation 警告 + DOCX-only verify)
 
 - **docs(scripts)**:`scripts/visual_review.py` — module docstring + `_parse_args` description + `_cli` banner 加 v1.4.0 deprecation 警告。此工具為 legacy opt-in(`html_to_pdf` 模組仍保留供 opt-in, 所以工具本身可運作), 但預設 `report_gen` pipeline 不再依賴它。如要視覺 review DOCX, 推薦 `soffice --headless --convert-to pdf <docx> --outdir <tmp>` 轉臨時 PDF 再 review。
