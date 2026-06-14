@@ -29,6 +29,9 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+# docx imports (top-level so helpers like _add_table / _add_pre can use Pt)
+from docx.shared import Pt
+
 # 允許 `python -m scripts.html_to_docx_direct` 從 project root 跑
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
