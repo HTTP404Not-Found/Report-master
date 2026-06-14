@@ -29,6 +29,11 @@ except ImportError:  # pragma: no cover
 
 # CSS 屬性禁用（regex 在 <style> 區塊與內聯 style 中匹配）
 # NOTE: float 規則獨立處理於 _check_float_on_non_img，會豁免 <img> 標準用法。
+# NOTE（D1, 2026-06-14 TR-2）: position: absolute / fixed / sticky 是 canonical
+#   禁用規則的唯一來源。任何後處理（_merge_html_docs / bundle.py /
+#   html_to_docx / html_to_pdf 等）若曾用 regex 偷偷剝除這些 CSS，是「過渡解」——
+#   應在 quality_checker 階段就 BLOCKING，不在後處理階段掩飾。v1.3.3 起確認
+#   此清單為 single source of truth。
 _FORBIDDEN_CSS_PROPS = [
     (r"display\s*:\s*(?:inline-)?flex\b", "display: flex / inline-flex"),
     (r"display\s*:\s*(?:inline-)?grid\b", "display: grid / inline-grid"),
@@ -239,6 +244,174 @@ def _dedupe(violations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         seen.add(key)
         out.append(v)
     return out
+
+
+# ────────────────────────────────────────────────────────────────────
+# Section Opener Rule（v1.1 新增 — D7 修復）
+# 對應 references/executor-base.md §3.3.5
+# 規則：每個 H2 / H3 後必須至少有 1 段 ≥ 2 句的引導 <p>
+# 違規 = WARN 級（不 BLOCKING；寫入 lock.metadata.warnings）
+# ────────────────────────────────────────────────────────────────────
+
+# 句末標記（英文 + 全形中文）。至少 2 句才算合格引導段。
+_SENTENCE_END_RE = re.compile(r"[.。!?!\uff1f\uff01]")
+
+# 不可直接接在 heading 後的區塊元素（不算 opener）
+_BLOCK_TAGS_AFTER_HEADING = {"ul", "ol", "table", "pre", "dl", "blockquote", "hr", "div", "section", "article", "figure"}
+
+
+def check_section_opener(html: str, source: str = "<string>") -> List[Dict[str, Any]]:
+    """Section Opener Rule 檢測（WARN 級）。
+
+    對每個 H2 / H3，檢查其後第一個非空 sibling 是否為 <p>，且 <p> 內文字
+    含 ≥ 2 個句末標記（`.` / `。` / `!` / `!` / `?` / `?`）。
+
+    Args:
+        html: HTML 字串
+        source: 來源標籤（用於 violation 記錄）
+
+    Returns:
+        list of warning dict: {rule, line, snippet, severity="WARN", heading_text}
+
+    Note:
+        - H1 是章節標題，章節首段已隱含；不在檢測範圍。
+        - 第一個 H2/H3（章節開頭）若無前置 H1 也不豁免——仍須有 opener。
+        - WARN 級：呼叫端應寫入 lock.metadata.warnings，不應 BLOCKING。
+    """
+    warnings: List[Dict[str, Any]] = []
+
+    if not _HAS_BS4:
+        # 沒有 bs4 視為「無法檢測」；回傳空 list（不誤報）
+        return warnings
+
+    soup = BeautifulSoup(html, "lxml")
+    body = soup.find("body") or soup
+
+    headings = body.find_all(["h2", "h3"])
+
+    for h in headings:
+        level = h.name
+        heading_text = h.get_text(strip=True)
+
+        # 找 heading 的下一個非空 sibling
+        nxt = h.find_next_sibling()
+        while nxt is not None and getattr(nxt, "name", None) is None:
+            nxt = nxt.find_next_sibling()
+
+        if nxt is None:
+            line_no = h.sourceline if hasattr(h, "sourceline") and h.sourceline else 0
+            warnings.append({
+                "rule": f"Section opener 缺失（{level} 後無內容）",
+                "line": line_no,
+                "snippet": heading_text[:80],
+                "severity": "WARN",
+                "heading_text": heading_text,
+                "heading_level": level,
+            })
+            continue
+
+        nxt_name = getattr(nxt, "name", None)
+
+        if nxt_name and nxt_name.lower() in _BLOCK_TAGS_AFTER_HEADING:
+            line_no = h.sourceline if hasattr(h, "sourceline") and h.sourceline else 0
+            warnings.append({
+                "rule": f"Section opener 缺失（{level} 直連 <{nxt_name}>）",
+                "line": line_no,
+                "snippet": heading_text[:80],
+                "severity": "WARN",
+                "heading_text": heading_text,
+                "heading_level": level,
+                "next_tag": nxt_name,
+            })
+            continue
+
+        if nxt_name and nxt_name.lower() != "p":
+            line_no = h.sourceline if hasattr(h, "sourceline") and h.sourceline else 0
+            warnings.append({
+                "rule": f"Section opener 缺失（{level} 後第一個元素為 <{nxt_name}>，應為 <p>）",
+                "line": line_no,
+                "snippet": heading_text[:80],
+                "severity": "WARN",
+                "heading_text": heading_text,
+                "heading_level": level,
+                "next_tag": nxt_name,
+            })
+            continue
+
+        if nxt_name and nxt_name.lower() == "p":
+            p_text = nxt.get_text(strip=True)
+            p_classes = nxt.get("class", []) or []
+            if "caption" in p_classes:
+                line_no = h.sourceline if hasattr(h, "sourceline") and h.sourceline else 0
+                warnings.append({
+                    "rule": f"Section opener 缺失（{level} 後第一個元素為 caption）",
+                    "line": line_no,
+                    "snippet": heading_text[:80],
+                    "severity": "WARN",
+                    "heading_text": heading_text,
+                    "heading_level": level,
+                    "next_tag": "p.caption",
+                })
+                continue
+
+            sentence_count = len(_SENTENCE_END_RE.findall(p_text))
+            if sentence_count < 2:
+                line_no = h.sourceline if hasattr(h, "sourceline") and h.sourceline else 0
+                warnings.append({
+                    "rule": f"Section opener 過短（{level} 後 <p> 僅 {sentence_count} 句，需 ≥ 2 句）",
+                    "line": line_no,
+                    "snippet": p_text[:80],
+                    "severity": "WARN",
+                    "heading_text": heading_text,
+                    "heading_level": level,
+                    "sentence_count": sentence_count,
+                })
+                continue
+
+    return warnings
+
+
+def write_warnings_to_lock(lock_path: Path, warnings: List[Dict[str, Any]]) -> int:
+    """把 warnings 寫入 lock.metadata.warnings（idempotent）。
+
+    lock.metadata.warnings 是非 schema 欄位（與 metadata.progress 同性質），
+    用途：給下游 reviewer / 視覺檢查知道哪些小節需要補 opener。
+
+    Args:
+        lock_path: report_lock.md 路徑
+        warnings: list of warning dict
+
+    Returns:
+        寫入的 warning 數量
+    """
+    try:
+        from scripts.report_lock import read_lock_with_body, write_lock
+    except ImportError:
+        return 0
+
+    if not lock_path.exists():
+        return 0
+
+    data, body = read_lock_with_body(lock_path)
+    if not isinstance(data, dict):
+        return 0
+    metadata = data.setdefault("metadata", {})
+    existing = metadata.get("warnings", []) or []
+
+    existing_keys = {(w.get("rule", ""), w.get("heading_text", "")): w for w in existing if isinstance(w, dict)}
+    added = 0
+    for w in warnings:
+        key = (w.get("rule", ""), w.get("heading_text", ""))
+        if key in existing_keys:
+            existing_keys[key].update({k: v for k, v in w.items() if k not in existing_keys[key]})
+        else:
+            existing.append(w)
+            existing_keys[key] = w
+            added += 1
+
+    metadata["warnings"] = existing
+    write_lock(lock_path, data, body=body)
+    return added
 
 
 # ────────────────────────────────────────────────────────────────────

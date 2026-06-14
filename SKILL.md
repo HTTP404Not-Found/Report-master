@@ -172,6 +172,29 @@ python -m scripts.report_gen generate \
   --output <report_output_dir>
 ```
 
+### 3.4 DOCX 引擎路由(lock → engine, v1.3.3 新增 — D3)
+
+依 `lock.output.docx_engine` 選擇 DOCX 生成路徑:
+
+| `lock.output.docx_engine` | 呼叫腳本 | 適用場景 |
+|---------------------------|----------|----------|
+| `pandoc`(預設) | `scripts.html_to_docx.html_to_docx` | 一般學術 / 商業報告;接受 Markdown 中介層 |
+| `python-docx` | `scripts.html_to_docx_direct.html_to_docx_direct` | 政府公文 / 期刊投稿;完全控制字體 / 段落 / 表格 |
+
+**路由意圖**:使用者於 Stage 1 `report_lock.md` 內指定 `output.docx_engine`,Stage 3 應依此路由到對應腳本。
+
+**目前狀態(v1.3.3 起)**:`report_gen.py` 的 DOCX 產生仍寫死呼叫 `html_to_docx`(pandoc),**未做自動 routing**。當 lock 指定 `output.docx_engine: python-docx` 時,使用者需:
+
+```bash
+# 手動跑 direct 路徑(不走 report_gen)
+python -m scripts.html_to_docx_direct \
+  --input <bundle.html> \
+  --output <out.docx> \
+  --lock-file <report_lock.md>
+```
+
+**TODO(下一輪)**:`report_gen.py` 增加 `--docx-engine` CLI flag + 自動讀 lock routing(與 `output.format` 同樣在 CLI 讀),讓 single entrypoint 可覆蓋兩條 DOCX 路徑。
+
 ---
 
 ## 4. Step 4 反饋路由（Feedback Routing）

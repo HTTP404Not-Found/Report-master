@@ -23,13 +23,13 @@ a { color: #1a73e8; text-decoration: underline; }
 
 <h2>1.1 研究背景</h2>
 
-<p>近年 AI 驅動的內容生成快速發展，從簡報 (ppt-master) 到本系統 (report-master) 皆試圖解決相同問題：<em>讓使用者從空白頁開始，用 90% 的 AI 協作消除報告寫作的啟動阻力</em>，產出結構完整、排版專業、可直接交付的報告書。</p>
+<p>近年 AI 驅動的內容生成快速發展，從簡報 (ppt-master) 到本系統 (report-master) 皆試圖解決相同問題：<em>讓使用者從空白頁開始，用 90% 的 AI 協作消除報告寫作的啟動阻力</em>，產出結構完整、排版專業、可直接交付的報告書。本節將從文獻脈絡出發，說明採用 HTML 作為中介格式的設計選擇與 trade-off，作為後續章節的鋪墊。</p>
 
 <p>參考 <a href="#ref1">[1]</a>、<a href="#ref2">[2]</a> 等文獻，本研究採用 <strong>HTML 作為中間格式</strong>，透過 weasyprint 與 pandoc 雙路徑產出 PDF 與 DOCX。</p>
 
 <h2>1.2 章節結構</h2>
 
-<p>本範例報告分為三章：</p>
+<p>本範例報告分為三章，依序為緒論、方法與結論。各章之間以引用編號相互串接，方便讀者交叉對照；以下先列出整體骨架供快速導覽。</p>
 
 <ul>
   <li>第一章 緒論（本文）</li>
@@ -38,6 +38,8 @@ a { color: #1a73e8; text-decoration: underline; }
 </ul>
 
 <h3>1.2.1 表格範例</h3>
+
+<p>下表整理本範例報告的字體、頁面與行距等基本規格，作為後續章節引用之基準。所有規格均與 <code>report_lock.md</code> 的 <code>formatting</code> 區塊對齊，並在 PDF/DOCX 階段以同一份 lock 套用。</p>
 
 <table>
   <thead>

@@ -170,6 +170,62 @@ for i in range(1, N):
 - 確保術語一致（前節譯「大型語言模型」，本節不能再寫「LLM」當主詞）
 - 確保章節交叉引用有效（如「見 §2.1」的 anchor 真的存在）
 
+### 3.3.5 Section Opener Rule（v1.1 新增 — D7）
+
+> **規則**：每個 H2 / H3 **必須**至少有 **1 段 ≥ 2 句的引導段落**，**禁止**直接接 `<ul>` / `<ol>` / `<table>` / `<pre>` / `<dl>` / `<blockquote>` 等區塊元素。
+> **為什麼**：LLM 生成常見毛病是「列點優先勝過敘事節奏」——讀者一進小節就看到 bullet 表，缺乏引導就難以進入。Section opener 是敘事流暢度的最小可行保證。
+> **檢測**：`scripts/quality_checker.check_section_opener(html)`（**WARN 級**，不 BLOCKING）
+> **自動補丁**：`scripts/revise_helper.py --ensure-opener`（v1.1 新增）
+
+**判定細節**（給 LLM 與 reviewer）：
+- **範圍**：所有 H2 / H3（H1 是章節標題，章節首段已隱含）
+- **引導段** = 在 heading 標籤**之後**的**第一個非空元素**必須是 `<p>`
+- **2 句** = `<p>` 內文字必須含 ≥ 2 個 sentence-ending 標記（`.` / `。` / `!` / `!` / `?` / `?` 任兩種組合，或兩個全形句號 `。`）
+- **豁免**：若 heading 為第一個元素（章節首段），不在此限（章節首段已在 H1 後檢查）
+- **不豁免**：caption (`<p class="caption">`)、`<p>` 內只有一句的、`<p>` 內沒有句號的——全部算違規
+
+**Before / After 範例**（從測試報告 D7 段直接搬）：
+
+❌ **Before（違規）**：H2 / H3 直接接 `<ul>` 或 `<table>`
+```html
+<h2>1.2 章節結構</h2>
+<ul>
+  <li>第一章 緒論（本文）</li>
+  <li>第二章 方法</li>
+</ul>
+
+<h3>1.2.1 表格範例</h3>
+<table>
+  <tr><th>項目</th><th>規格</th></tr>
+  <tr><td>字體</td><td>標楷體</td></tr>
+</table>
+```
+
+✅ **After（合規）**：每個 H2/H3 前先放引導段
+```html
+<h2>1.2 章節結構</h2>
+<p>本範例報告分為三章，依序為緒論、方法與結論。各章之間以引用編號相互串接，方便讀者交叉對照。</p>
+<ul>
+  <li>第一章 緒論（本文）</li>
+  <li>第二章 方法</li>
+</ul>
+
+<h3>1.2.1 表格範例</h3>
+<p>下表整理本範例報告的字體、頁面與行距等基本規格，作為後續章節引用之基準。</p>
+<table>
+  <tr><th>項目</th><th>規格</th></tr>
+  <tr><td>字體</td><td>標楷體</td></tr>
+</table>
+```
+
+**與 quality_checker 的協作**：
+- `check_section_opener()` 為 **WARN 級**——寫入 `lock.metadata.warnings[]`，不阻斷 Stage 2 pipeline
+- 但若違規 ≥ 3 個或警告累積 ≥ 5 個，`export_checker.py` 會在 Stage 3 結束時提示使用者「敘事節奏待改善」
+
+**修補工具**：`scripts/revise_helper.py --ensure-opener <section>` 對缺 opener 的小節自動生成引導段（使用 LLM 或 fallback placeholder「本節將說明…」），預設 off，需 `--write` 才實際寫回 HTML。
+
+---
+
 ### 3.4 Step 3：對當前節 prompt LLM 生成 HTML
 
 ```python

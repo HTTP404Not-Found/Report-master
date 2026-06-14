@@ -41,7 +41,7 @@ from scripts.delta_checker import (  # noqa: E402
     check_lock,
     write_delta_report,
 )
-from scripts.quality_checker import check_html  # noqa: E402
+from scripts.quality_checker import check_html, check_section_opener  # noqa: E402
 from scripts.report_lock import read_lock  # noqa: E402
 
 
@@ -126,6 +126,86 @@ def apply_revision(html: str, instruction: str, section_path: Path) -> str:
 
 
 # ────────────────────────────────────────────────────────────────────
+# Section Opener 自動補丁（v1.1 新增 — D7）
+# 對應 references/executor-base.md §3.3.5
+# ────────────────────────────────────────────────────────────────────
+
+# 預設 placeholder 引導段（LLM 不可用時 fallback）
+# 必須含 ≥ 2 句（讓 check_section_opener 驗證通過）
+_DEFAULT_OPENER = (
+    "<p>本節將說明 {title} 的核心概念與關鍵細節，"
+    "並銜接前後小節的論述脈絡，方便讀者循序理解。"
+    "以下內容涵蓋該小節的主要論點與重要資料，供讀者快速建立背景知識。</p>"
+)
+
+
+def build_opener_paragraph(heading_text: str, use_placeholder: bool = True) -> str:
+    """生成一段引導 <p>。
+
+    預設用 placeholder（不呼叫 LLM，避免 network / API key 依賴）。
+    未來可擴充：若設定 LLM_API_URL/KEY/MODEL，可呼叫 LLM 生成更貼題的引導段。
+
+    Args:
+        heading_text: heading 文字
+        use_placeholder: True → 用 placeholder；False → 留待未來 LLM 擴充
+
+    Returns:
+        <p>...</p> HTML 片段
+    """
+    if use_placeholder:
+        clean_title = re.sub(r"^[\d.]+\s*", "", heading_text).strip()
+        clean_title = re.sub(r"^第[一二三四五六七八九十百\d]+(章|篇)\s*", "", clean_title).strip()
+        if not clean_title:
+            clean_title = "本節"
+        return _DEFAULT_OPENER.format(title=clean_title)
+    return _DEFAULT_OPENER.format(title=heading_text)
+
+
+def ensure_section_openers(
+    html: str,
+    *,
+    use_placeholder: bool = True,
+) -> Tuple[str, List[Dict[str, Any]]]:
+    """對 HTML 中所有缺 opener 的 H2/H3 自動補上引導段。
+
+    Args:
+        html: 原始 HTML 字串
+        use_placeholder: True → 用 placeholder；False → 留待 LLM 擴充
+
+    Returns:
+        (patched_html, fixed_warnings) — patched_html 為修補後 HTML；
+        fixed_warnings 為原本違規清單（給 caller 寫報告用）。
+    """
+    warnings = check_section_opener(html)
+    if not warnings:
+        return html, []
+
+    patched = html
+    seen_headings = set()
+    for w in reversed(warnings):
+        h_text = w.get("heading_text", "")
+        if not h_text or h_text in seen_headings:
+            continue
+        seen_headings.add(h_text)
+
+        opener_html = build_opener_paragraph(h_text, use_placeholder=use_placeholder)
+
+        pattern = re.compile(
+            r"(</h[23]>)(\s*)(?=<)",
+            flags=re.IGNORECASE,
+        )
+        patched_new, n = pattern.subn(
+            lambda m: m.group(1) + m.group(2) + opener_html,
+            patched,
+            count=1,
+        )
+        if n > 0:
+            patched = patched_new
+
+    return patched, warnings
+
+
+# ────────────────────────────────────────────────────────────────────
 # 整合流程
 # ────────────────────────────────────────────────────────────────────
 
@@ -138,16 +218,13 @@ def run_revise(
     write: bool = False,
     dry_run: bool = False,
     report_path: Optional[Path] = None,
+    ensure_opener: bool = False,
 ) -> Dict:
     """跑一次 revise 流程，回傳結果 dict。
 
-    Steps:
-      1. 讀 lock 與 section HTML
-      2. dry_run / write 決定是否實際寫回
-      3. 套用 revision（永遠產生 revised HTML 以便 quality_check）
-      4. quality_checker 驗證
-      5. check_lock 確保 lock 沒被動（這裡 lock 不變 → 應 passed）
-      6. 寫回 / 寫報告
+    Args:
+        ensure_opener: 若 True，先對 section HTML 跑 ensure_section_openers()
+            把缺引導段的 H2/H3 補上 <p>（v1.1 新增 — D7）。預設 False。
     """
     section_path = locate_section(section_target, project_root)
     original_html = section_path.read_text(encoding="utf-8")
@@ -159,14 +236,23 @@ def run_revise(
         "instruction": instruction,
         "write": write,
         "dry_run": dry_run,
+        "ensure_opener": ensure_opener,
         "actions": [],
     }
+
+    # 0. ensure_opener（v1.1 新增 — D7）：先補引導段
+    if ensure_opener:
+        original_html, opener_warnings = ensure_section_openers(original_html)
+        plan["actions"].append(
+            f"ensure-opener：套用 {len(opener_warnings)} 條 opener 補丁"
+        )
+        plan["opener_warnings"] = opener_warnings
 
     # 1. 模擬 revise
     revised_html = apply_revision(original_html, instruction, section_path)
     plan["actions"].append("套用 revise-note meta tag")
 
-    # 2. quality_checker 驗證（包成 try/except，因 check_html 對 BLOCKING 直接 raise）
+    # 2. quality_checker 驗證
     try:
         check_html(revised_html, source=str(section_path))
         qc_passed = True
@@ -185,11 +271,11 @@ def run_revise(
         plan["abort_reason"] = "quality_checker 失敗（HTML 不合規）"
         return plan
 
-    # 3. lock diff（revise 不應動 lock → 應為 passed=True、無差異）
-    lock_report = check_lock(lock_data, lock_data)  # 同物件 → 應無差異
+    # 3. lock diff
+    lock_report = check_lock(lock_data, lock_data)
     plan["lock_diff"] = lock_report.to_dict()
 
-    # 4. dry-run：顯示，不寫
+    # 4. dry-run
     if dry_run:
         plan["actions"].append("dry-run：未寫入任何檔案")
         return plan
@@ -242,6 +328,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="dry run：顯示會做什麼，不寫任何檔案",
     )
     ap.add_argument(
+        "--ensure-opener", action="store_true",
+        help="v1.1 新增（D7）：自動為缺引導段的 H2/H3 補上 <p> opener；預設 off（需搭配 --write 才實際寫回）",
+    )
+    ap.add_argument(
         "--report", default="report_output/delta_report.md",
         help="delta 報告輸出路徑",
     )
@@ -273,6 +363,7 @@ def _main() -> int:
             write=args.write,
             dry_run=args.dry_run or (not args.write),
             report_path=(project_root / args.report) if args.report else None,
+            ensure_opener=args.ensure_opener,
         )
     except FileNotFoundError as e:
         print(f"❌ {e}", file=sys.stderr)
@@ -286,10 +377,18 @@ def _main() -> int:
     else:
         print(f"📝 Revise plan: section={plan['section_path']}")
         print(f"   instruction: {plan['instruction']}")
-        print(f"   write={plan['write']}  dry_run={plan['dry_run']}")
+        print(f"   write={plan['write']}  dry_run={plan['dry_run']}  ensure_opener={plan.get('ensure_opener', False)}")
         print(f"   actions:")
         for a in plan["actions"]:
             print(f"     • {a}")
+        if "opener_warnings" in plan:
+            ow = plan["opener_warnings"]
+            if ow:
+                print(f"   opener_warnings ({len(ow)}):")
+                for w in ow:
+                    print(f"     - [{w.get('heading_level', '?')}] {w.get('heading_text', '')} → {w.get('rule', '')}")
+            else:
+                print(f"   opener_warnings: 無（已全數合規）")
         if "quality_check" in plan:
             qc = plan["quality_check"]
             status = "✅" if qc["passed"] else "❌"

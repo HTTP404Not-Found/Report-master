@@ -28,6 +28,8 @@ class ExportCheckReport:
     pdf_report: Dict[str, Any] = field(default_factory=dict)
     docx_report: Dict[str, Any] = field(default_factory=dict)
     issues: List[str] = field(default_factory=list)
+    # v1.3.3 新增 — D5: Office 暫存檔 (~$) 警告 (WARN 級,不 BLOCKING)
+    warnings: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -180,6 +182,40 @@ def _check_docx(docx_path: Path) -> Dict[str, Any]:
 # Main API
 # ────────────────────────────────────────────────────────────────────
 
+def _check_office_lock_files(pdf_path: Optional[Path], docx_path: Optional[Path]) -> List[str]:
+    """v1.3.3 新增 — D5: 掃 Office 暫存檔 (~$)。
+
+    Office Word / Excel / PowerPoint 在檔案被開啟時會產生以 `~$` 開頭的
+    lock file (例: `~$report_final.docx`)。如果 exports/ 目錄裡還有這類
+    檔案，代表上次的 Office session 未正常關閉，可能導致：
+      - 匯出期間被寫入不完全的 DOCX 覆蓋
+      - CI / 交付時帶著假的「交付物」
+
+    這是 **WARN 級** 檢查（不 BLOCKING），僅提示使用者手動清理。
+    """
+    warnings: List[str] = []
+    scanned_dirs: set = set()
+
+    for p in (pdf_path, docx_path):
+        if p is None:
+            continue
+        parent = p.parent.resolve()
+        if parent in scanned_dirs:
+            continue
+        scanned_dirs.add(parent)
+        try:
+            for entry in parent.iterdir():
+                if entry.name.startswith("~$"):
+                    warnings.append(
+                        f"Office 暫存檔未清理: {entry.name} "
+                        f"({parent}) — 可能是上次 Office session 未正常關閉"
+                    )
+        except OSError as e:
+            warnings.append(f"掃描目錄失敗: {parent} — {e}")
+
+    return warnings
+
+
 def check_export(
     pdf_path: Optional[Union[str, Path]] = None,
     docx_path: Optional[Union[str, Path]] = None,
@@ -230,6 +266,10 @@ def check_export(
             for issue in docx_rep.get("issues", []):
                 report.issues.append(f"[DOCX] {issue}")
 
+    # v1.3.3 新增 — D5: Office 暫存檔警告 (WARN 級)
+    lock_warnings = _check_office_lock_files(pdf_p, docx_p)
+    report.warnings.extend(lock_warnings)
+
     return report
 
 
@@ -271,6 +311,12 @@ def _main() -> int:
             print(f"❌ EXPORT FAIL")
             for issue in rep.issues:
                 print(f"  • {issue}")
+
+        # v1.3.3 新增 — D5: Office 暫存檔警告 (WARN 級)
+        if rep.warnings:
+            print(f"\n⚠️  WARN ({len(rep.warnings)}):")
+            for w in rep.warnings:
+                print(f"  ⚠ {w}")
 
     return 0 if rep.passed else 1
 

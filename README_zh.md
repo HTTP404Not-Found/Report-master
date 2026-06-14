@@ -5,8 +5,8 @@
 [![GitHub](https://img.shields.io/badge/github-HTTP404Not--Found%2FReport--master-blue?logo=github)](https://github.com/HTTP404Not-Found/Report-master)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python)](https://www.python.org/)
 [![Pipeline](https://img.shields.io/badge/pipeline-Stage%200%20%E2%86%92%203-success)](#-三階段流程--pipeline-stages)
-[![Progress](https://img.shields.io/badge/progress-40%2F40%20(100%25)-success)](#-開發進度--progress)
-[![Tests](https://img.shields.io/badge/tests-418%2F421%20pass-brightgreen)](#-測試--testing)
+[![Progress](https://img.shields.io/badge/progress-40%2F40%20%2B%206%2F6%20TR--2%20(100%25)-success)](#-開發進度--progress)
+[![Tests](https://img.shields.io/badge/tests-444%2F446%20pass-brightgreen)](#-測試--testing)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 > 英文版請見 [`README.md`](README.md)。
@@ -475,7 +475,7 @@ graph LR
 
 ## 開發進度 / Progress
 
-整體進度:**40 / 40 (100%)**(2026-06-14 更新)。下表依階段列出已完工 / 進行中 / 待辦的分佈,以及對應的工作量估計。完整任務清單、相依圖、優先級矩陣見 [`tasks.md`](tasks.md)。
+整體進度:**40 / 40 + 6/6 TR-2 修復 (100%)**(2026-06-14 更新)。下表依階段列出已完工 / 進行中 / 待辦的分佈,以及對應的工作量估計。完整任務清單、相依圖、優先級矩陣見 [`tasks.md`](tasks.md)。
 
 | 階段 | 進度 | 狀態 |
 |------|------|------|
@@ -483,6 +483,7 @@ graph LR
 | Phase 1 MVP(PDF) | 9/9 (100%) | ✅ 完成 |
 | Phase 2 雙格式(PDF + DOCX) | 8/9 (89%) | 🟡 剩 python-docx 平行路徑 |
 | Phase 3 完整 Workflow | 17/17 (100%) | ✅ 全部 workflow + CI + 範例完工 |
+| **Phase 4 TR-2 修復批次(D7 + D1/D3/D5)** | **6/6 (100%)** | ✅ **2026-06-14 完工 (v1.3.3)** |
 
 ### 已知限制 / Known Limitations
 
@@ -503,7 +504,7 @@ graph LR
 
 ## 測試 / Testing
 
-測試套件用 pytest,目前 **418 / 421 tests pass** (3 個失敗為 html_to_docx_direct 既有問題,詳見 tests/)。每個 `test_*.py` 對應 `scripts/` 內的對應模組,從 config 到 quality_checker / html_to_pdf / html_to_docx / html_to_docx_direct / toc_generator / executor / strategist / topic_research / build_template 全部覆蓋。
+測試套件用 pytest,目前 **444 / 446 tests pass**(2 個 skipped 為既有)。每個 `test_*.py` 對應 `scripts/` 內的對應模組,從 config 到 quality_checker / html_to_pdf / html_to_docx / html_to_docx_direct / toc_generator / executor / strategist / topic_research / build_template 全部覆蓋。v1.3.3 新增 `tests/test_quality_checker_section_opener.py`(13 個 case — Section Opener Rule 整合測試, D7)。
 
 ```bash
 # 全部跑
@@ -513,7 +514,7 @@ graph LR
 .venv/bin/pytest tests/test_config.py -v
 ```
 
-**當前狀態:418 / 421 tests pass** (3 個失敗為 html_to_docx_direct 既有問題)
+**當前狀態:444 / 446 tests pass**(2 個 skipped 為既有;v1.3.3 新增 13 個 D7 整合測試)
 
 | 測試模組 | 涵蓋 |
 |----------|----------|
@@ -592,6 +593,19 @@ python -m scripts.report_gen \
 ---
 
 ## 更新日誌 / Changelog
+
+### v1.3.3 — 2026-06-14(Section Opener Rule + 整合測試, D7)
+
+- **feat: Section Opener Rule(D7, wai 強調)** — H2 / H3 後必須至少有 1 段 ≥ 2 句的引導 `<p>`,禁止直接接 `<ul>` / `<ol>` / `<table>` / `<pre>` / `<dl>` / `<blockquote>` 等區塊元素。LLM 生成常見毛病是「列點優先勝過敘事節奏」,Section opener 是敘事流暢度的最小可行保證。
+  - **docs**:`references/executor-base.md` §3.3.5 新增 Section Opener Rule 段落(含 before / after 範例、判定細節、與 quality_checker 的協作說明、修補工具指引)。
+  - **feat**:`scripts/quality_checker.py` 新增 `check_section_opener(html)` 函式 — WARN 級(不 BLOCKING),可獨立呼叫;違規寫入 `lock.metadata.warnings`(與 `metadata.progress` 同性質的非 schema 欄位)。提供 `write_warnings_to_lock()` 工具給 Stage 2 / Stage 2.5 / export_checker 共用。
+  - **feat**:`scripts/revise_helper.py` 新增 `--ensure-opener` CLI flag + `ensure_section_openers()` / `build_opener_paragraph()` 內部 API,對缺 opener 的小節自動補上引導段(placeholder 預設,LLM 路徑留待擴充)。預設 off。
+  - **test**:`tests/test_quality_checker_section_opener.py` 新整合測試,涵蓋 13 個 case(3 必要 + 6 補充 + 3 範例 + 1 邊界):PASS / FAIL-H2-list / FAIL-H3-table / 過短 opener / caption 不算 opener / revise_helper 修補流程 / examples 端到端。
+  - **fix**:`examples/section_1.html` 修補 3 條 opener 違規(1.1 / 1.2 / 1.2.1)— 因為這是 integration test 的目的,範例是給使用者參考的「最佳實踐模板」,不應帶違規。
+- **chore(D1)**:`scripts/quality_checker.py` `_FORBIDDEN_CSS_PROPS` 加 canonical-source TODO 註解 — `position: absolute / fixed / sticky` 規則是禁用清單唯一來源;後處理階段(任何 `_merge_html_docs` 變體)若有 regex 剝除這些 CSS 的 workaround,是「過渡解」,應在 quality_checker 階段 BLOCKING,不在後處理階段掩飾。規則已存在(v1.3.2 起),此處只是補上文件化的 single-source-of-truth 聲明。
+- **docs(D3)**:`SKILL.md §3.4` 新增 DOCX 引擎路由說明 — 依 `lock.output.docx_engine` 選擇 `html_to_docx`(pandoc) vs `html_to_docx_direct`(python-docx)。標註目前 `report_gen.py` 未做自動 routing(待下一輪實作 `--docx-engine` flag)。
+- **feat(D5)**:`scripts/export_checker.py` 加 `_check_office_lock_files()` — 掃描 exports/ 目錄裡 `~$` 開頭的 Office 暫存檔(代表上次 Office session 未正常關閉),WARN 級輸出。`ExportCheckReport` 加 `warnings: List[str]` 欄位(向後相容)。
+- **雙語 README 同步** — Progress 表格、Changelog、version footer 全部同步至 v1.3.3(`README.md` + `README_zh.md` 平行),遵守 AGENTS.md #9 hard rule。
 
 ### v1.3.2 — 2026-06-14(新增「推薦提示詞」章節)
 
@@ -675,7 +689,7 @@ SOFTWARE.
 ---
 
 <p align="center">
-  <sub>Report-master v1.3.2 — 新增「推薦提示詞」章節(4 層 prompt 模板)· 40/40 (100%) · 2026-06-14</sub><br>
+  <sub>Report-master v1.3.3 — Section Opener Rule + 整合測試(D7) · 40/40 + 6/6 TR-2 (100%) · 2026-06-14</sub><br>
   <sub>Built with 🐍 Python · 🧱 HTML intermediate · 📄 weasyprint · 📝 pandoc</sub>
   <sub>本 README 為中文版 · 英文版請見 <a href="README.md">README.md</a></sub>
 </p>

@@ -5,8 +5,8 @@
 [![GitHub](https://img.shields.io/badge/github-HTTP404Not--Found%2FReport--master-blue?logo=github)](https://github.com/HTTP404Not-Found/Report-master)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python)](https://www.python.org/)
 [![Pipeline](https://img.shields.io/badge/pipeline-5--Step%20Phase%20Flow-success)](#-pipeline--5-step-phase-flow)
-[![Progress](https://img.shields.io/badge/progress-40%2F40%20(100%25)-success)](#-progress)
-[![Tests](https://img.shields.io/badge/tests-418%2F421%20pass-brightgreen)](#-testing)
+[![Progress](https://img.shields.io/badge/progress-40%2F40%20%2B%206%2F6%20TR--2%20(100%25)-success)](#-progress)
+[![Tests](https://img.shields.io/badge/tests-444%2F446%20pass-brightgreen)](#-testing)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 > Looking for the Chinese version? See [`README_zh.md`](README_zh.md).
@@ -66,16 +66,17 @@ The project is split into four phases. **Phase 3 is complete (40/40 = 100%).** A
 - **`glossary.md`** — a terminology-table template that prevents *narrative drift* in long reports (the same concept being called by two names across sections).
 - **Font strategy** — `fonts/` is a bundle directory, and `config.py` runs a fail-fast check at startup to confirm 標楷體 (DFKai-SB / KaiTi) and Times New Roman are both present.
 
-### Phase 1 ✅ MVP — PDF Path (100%)
+### Phase 1 ✅ MVP — DOCX Path (100%; legacy PDF Path retired in v1.4.0)
 
 - `config.py` — `.env` load chain plus a fail-fast font check.
 - `project_manager.py` — one-shot directory scaffolding and `report_lock.md` template generation.
 - `source_to_md/` — the unified PDF / DOCX / URL → Markdown pipeline (the Stage 0 entry).
 - `html_to_pdf.py` — weasyprint rendering with font-embedding verification, ensuring offline-readable PDFs.
+ - `html_to_pdf.py` — weasyprint rendering with font-embedding verification, ensuring offline-readable PDFs. **(v1.4.0: legacy; not invoked by the default `report_gen` pipeline. The `html_to_pdf.py` module is kept for opt-in scenarios.)**
 - `quality_checker.py` — basic gate (HTML syntax + fonts + forbidden CSS list).
 - `report_gen.py` Phase 1 integration — one-shot PDF output.
 
-### Phase 2 ✅ Dual Format PDF + DOCX (89%)
+### Phase 2 ✅ DOCX-first; PDF path legacy (89% → DOCX-only in v1.4.0)
 
 - `html_to_docx.py` — pandoc + reference docx path, turning HTML into structurally-stable Word documents.
 - `templates/reference/report-master-template.docx` — pre-loaded font styles (CJK=標楷體 / Latin=Times New Roman), so Word opens with zero manual setup.
@@ -84,7 +85,7 @@ The project is split into four phases. **Phase 3 is complete (40/40 = 100%).** A
 - `footnote_manager.py` — pandoc-native `^[note]` syntax plus CSL citation management.
 - `mermaid_renderer.py` — pre-renders Mermaid to SVG (avoids weasyprint's silent failure on missing JS engine).
 - `katex_renderer.py` — pre-renders KaTeX math to PNG (same reason).
-- `report_gen.py` Phase 2 integration — **parallel PDF + DOCX output**.
+ - `report_gen.py` Phase 2 integration — **DOCX output (HTML intermediate)**. (v1.4.0: PDF parallel output retired; `--format pdf,docx` is accepted but PDF entries are silently dropped.)
 - 🚧 `html_to_docx_direct.py` — a python-docx parallel path (disabled by default; intended for format-strict scenarios like government documents or academic submission).
 
 ### Phase 3 ✅ Complete Workflow (100%)
@@ -124,6 +125,8 @@ pip install -r scripts/requirements.txt
 # Ubuntu/Debian
 sudo apt install pandoc libpango-1.0-0 libpangoft2-1.0-0
 # See https://doc.weasyprint.org/en/stable/install.html for full weasyprint dependencies
+# (v1.4.0: pandoc is required; weasyprint is optional/legacy — only needed if you want to
+#  re-enable the PDF render path via `scripts/html_to_pdf.py` opt-in.)
 
 # 4. run the example (produces PDF + DOCX under /tmp/rm-test)
 python -m scripts.report_gen \
@@ -132,13 +135,13 @@ python -m scripts.report_gen \
   --lock examples/lock.md
 
 # Expected output:
-#   /tmp/rm-test/_bundle.html           (HTML bundle)
-#   /tmp/rm-test/report_<timestamp>.pdf
+#   /tmp/rm-test/_bundle.html           (HTML intermediate, internal)
 #   /tmp/rm-test/report_<timestamp>.docx
+#   (v1.4.0: PDF is no longer produced; pass `--format docx,html` to also get a named HTML file.)
 ls /tmp/rm-test
 ```
 
-> **Expected outcome:** exit code 0, both `.pdf` and `.docx` files present, and `export_checker.py` is fully green (page count > 0, fonts embedded, TOC links valid).
+> **Expected outcome:** exit code 0, the `.docx` file is present, and `export_checker.py` is fully green on its 5 DOCX checks (DOCX opens, `[Content_Types].xml` present, `word/document.xml` present with at least 1 paragraph, ZIP integrity, DOCX TOC field valid). v1.4.0+ no longer produces PDF.
 
 ---
 
@@ -222,9 +225,9 @@ python -m scripts.report_gen \
 
 1. Read `report_lock.md` → validate the 17 required fields (missing → BLOCKING).
 2. Run `quality_checker.py` against every section HTML.
-3. Run `html_to_pdf.py` and `html_to_docx.py` in **parallel**.
-4. Run `export_checker.py` for final acceptance.
-5. PASS → write `exports/report_<ts>.{pdf,docx}`; FAIL → non-zero exit + reason.
+3. (v1.4.0) Run `html_to_docx.py` (default; PDF is no longer produced by the orchestrator; HTML named output is only emitted when `--format html,docx` is passed).
+4. Run `export_checker.py` 5-item DOCX acceptance.
+5. PASS → write `exports/report_<ts>.docx` (and `exports/report_<ts>.html` if `--format html,docx` was passed); FAIL → non-zero exit + reason.
 
 ### Scenario 2: Stage 3 Only (HTML → PDF/DOCX)
 
@@ -234,8 +237,10 @@ Best for "HTML is already generated (either from a one-off Stage 2 run, or hand-
 python -m scripts.report_gen render \
   --html <bundle.html> \
   --output <exports_dir> \
-  --format pdf,docx
+  --format docx            # default; or --format docx,html to also emit a named HTML file
 ```
+
+> **v1.4.0 migration note**: The old `--format pdf,docx` flag is still accepted, but non-`docx` / non-`html` entries are silently dropped.
 
 ### Scenario 3: Stage 2 Only (HTML Generation)
 
@@ -258,6 +263,7 @@ python -m scripts.report_gen generate \
 | `python -m scripts.config check` | Font + .env fail-fast check |
 | `python -m scripts.quality_checker <file.html>` | Run the quality gate against a single HTML file |
 | `python -m scripts.export_checker --pdf <path> --docx <path>` | post-export acceptance check |
+| `python -m scripts.export_checker --docx <path>` (v1.4.0+) | post-export acceptance (DOCX-only, 5 checks); `--pdf` is deprecated and ignored |
 
 For the full CLI spec, parameter list, and exit-code semantics, see [`architecture.md`](architecture.md#介面定義).
 
@@ -269,7 +275,7 @@ Four tiers of LLM-facing prompts, from highest-level trigger to lowest-level bui
 
 ### Tier A — One-liner Trigger (paste into any LLM chat)
 
-For end-users who want the agent to drive the full **5-step phase flow** end-to-end.
+(v1.4.0+: user-facing output is DOCX; the prompt below targets DOCX as the final deliverable. PDF is no longer produced by the orchestrator.)
 
 ```
 Use Report-master to run the 5-step phase flow and produce a report.
@@ -335,9 +341,10 @@ cd /home/ubuntu/.openclaw/workspace/projects/report-master
 python scripts/build_spec_docx.py --page-numbers --toc
 
 # 2) Main pipeline orchestrator (3 modes — see SKILL.md §3)
-python -m scripts.report_gen --source <input> --output exports/ --lock examples/lock.md       # full auto
-python -m scripts.report_gen render --html bundle.html --output exports/ --format pdf,docx  # Stage 3 only
-python -m scripts.report_gen generate --lock examples/lock.md --output report_output/        # Stage 2 only
+python -m scripts.report_gen --source <input> --output exports/ --lock examples/lock.md              # full auto (DOCX)
+python -m scripts.report_gen render --html bundle.html --output exports/ --format docx,html         # Stage 3 only (DOCX + named HTML)
+python -m scripts.report_gen generate --lock examples/lock.md --output report_output/               # Stage 2 only
+python -m scripts.report_gen render --html bundle.html --output exports/ --format docx              # Stage 3 only, DOCX-only
 
 # 3) Regression tests
 .venv/bin/python -m pytest tests/ -q
@@ -375,6 +382,7 @@ Report-master runs as a **5-step phase flow**, with each step mapping to one or 
 3. **Structure** — Outliner (`phase-3-outliner`) produces the Section Blueprint (`0_outline.md` + `0_outline_for_review.md`) before user confirmation.
 4. **User Confirmation** — explicit human-in-the-loop gate (`user-confirmation` workflow); writes `0_confirmed.json` before Executor starts.
 5. **Format** — mechanical PDF + DOCX export (`html_to_pdf` + `html_to_docx`); no content changes after this step.
+5. **Format (v1.4.0+)** — mechanical DOCX export (`html_to_docx`); HTML remains a user-accessible output via `--format html,docx`. PDF is no longer produced. No content changes after this step.
 
 **Feedback routing (Step 4 → which step to rewind):**
 
@@ -408,6 +416,10 @@ The pipeline is split into five stages, from "raw input in" to "deliverable out"
 │  Stage 3 — Engineering Conversion (PDF + DOCX in parallel)          │
 │    Parallel: weasyprint → PDF · pandoc → DOCX                       │
 │    export_checker.py post-export check                              │
+│  Stage 3 — Engineering Conversion (v1.4.0: DOCX-only)              │
+│    Primary: pandoc → DOCX                                           │
+│    Optional: emit named HTML via `--format html,docx`               │
+│    export_checker.py post-export check (5 DOCX-only checks)         │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -416,6 +428,7 @@ The pipeline is split into five stages, from "raw input in" to "deliverable out"
 | Role | When | Responsibility |
 |------|----------|------|
 | **Strategist** | Stage 1 | Hold 10-Confirmation dialogue with the user; write `report_lock.md` and `report_spec.md`; **does NOT**: write HTML, invoke weasyprint |
+| **Strategist** | Stage 1 | Hold 10-Confirmation dialogue with the user; write `report_lock.md` and `report_spec.md`; **does NOT**: write HTML, invoke weasyprint (v1.4.0+: weasyprint path is opt-in only) |
 | **Executor** | Stage 2 | Per section: re-read lock + glossary + previous HTML → generate the section HTML → pass the quality gate; **does NOT**: run sub-agents in parallel across sections (narrative will drift) |
 
 ### Built-in Workflows
@@ -428,6 +441,7 @@ The pipeline is split into five stages, from "raw input in" to "deliverable out"
 | `generate-citations` | bib / CSL / `--citeproc` management | ✅ |
 | `live-preview` | In-browser HTML preview | ✅ |
 | `visual-review` | PDF screenshot self-check | 🚧 |
+| `visual-review` | DOCX structure self-check (v1.4.0+; PDF screenshot flow retired from default) | 🚧 |
 
 For the full workflow index and trigger conditions, see [`workflows/`](workflows/).
 
@@ -476,7 +490,7 @@ See [`SPEC.md §3.4.1`](SPEC.md#341-字體與排版規定硬性規則--mandatory
 
 ## Progress
 
-Overall progress: **40 / 40 (100%)** (updated 2026-06-13). The table below shows the done / in-progress / todo split per phase, with the corresponding effort estimate. For the full task list, dependency graph, and priority matrix, see [`tasks.md`](tasks.md).
+Overall progress: **40 / 40 (100%)** (updated 2026-06-14). The table below shows the done / in-progress / todo split per phase, with the corresponding effort estimate. For the full task list, dependency graph, and priority matrix, see [`tasks.md`](tasks.md).
 
 | Phase | Progress | Status |
 |------|------|------|
@@ -484,6 +498,8 @@ Overall progress: **40 / 40 (100%)** (updated 2026-06-13). The table below shows
 | Phase 1 MVP (PDF) | 9/9 (100%) | ✅ Done |
 | Phase 2 Dual format (PDF + DOCX) | 8/9 (89%) | 🟡 Only python-docx parallel path remains |
 | Phase 3 Complete workflow | 17/17 (100%) | ✅ All workflows, CI and examples complete |
+| **Phase 4 TR-2 fix batch (D7 + D1/D3/D5)** | **6/6 (100%)** | ✅ **Done 2026-06-14 (v1.3.3)** |
+| **v1.4.0 (DOCX-only scope reduction)** | **scope reduction** | ✅ **Done 2026-06-14: PDF user-facing output removed; DOCX is the user-facing deliverable; HTML is the pipeline intermediate (also user-accessible via `--format html,docx`); `html_to_pdf.py` module kept for legacy opt-in. `export_checker.py` 7 → 5 checks. Bilingual SKILL.md / README / README_zh.md in sync.** |
 
 ### Known Limitations
 
@@ -504,7 +520,7 @@ Listing current "cannot do"s and tunable parameters transparently so contributor
 
 ## Testing
 
-The test suite uses pytest, with **418 / 421 tests passing** at the moment (3 failures in html_to_docx_direct are pre-existing; see tests/). Every `test_*.py` corresponds to a module in `scripts/`, covering everything from config to quality_checker / html_to_pdf / html_to_docx / html_to_docx_direct / toc_generator / executor / strategist / topic_research / build_template.
+The test suite uses pytest, with **444 / 446 tests passing** at the moment (2 skipped — pre-existing). Every `test_*.py` corresponds to a module in `scripts/`, covering everything from config to quality_checker / html_to_pdf / html_to_docx / html_to_docx_direct / toc_generator / executor / strategist / topic_research / build_template. v1.3.3 added `tests/test_quality_checker_section_opener.py` (13 cases — Section Opener Rule integration test, D7).
 
 ```bash
 # run the full suite
@@ -514,7 +530,7 @@ The test suite uses pytest, with **418 / 421 tests passing** at the moment (3 fa
 .venv/bin/pytest tests/test_config.py -v
 ```
 
-**Current state: 418 / 421 tests pass** (3 failures in html_to_docx_direct; see tests/)
+**Current state: 444 / 446 tests pass** (2 skipped — pre-existing; v1.3.3 added 13 new tests for D7 integration)
 
 | Test Module | Coverage |
 |----------|----------|
@@ -607,6 +623,31 @@ Four fundamental workflow issues have been resolved:
 
 ## Changelog
 
+### v1.4.0 — 2026-06-14 (DOCX-only user-facing output)
+
+> **BREAKING**: User-facing output no longer includes PDF. DOCX is the primary user-facing deliverable. HTML is the pipeline intermediate (Stage 2 → 3) and remains user-accessible via `--format html,docx`.
+
+- **feat!(report_gen)**: `report_gen.py` `--format` flag accepts `docx` (default) and `html`; `pdf` is silently dropped. `Stage3Result.pdf` field removed. `_stage3_render` no longer imports / calls `html_to_pdf`. The `html_to_pdf.py` module is preserved (not deleted) for future opt-in re-enablement.
+- **feat!(export_checker)**: 7-item → 5-item checks. Removed: PDF opens / PDF fonts embedded / PDF page count > 0. Kept (DOCX 5 checks): opens / `[Content_Types].xml` / `word/document.xml` + ≥ 1 paragraph / ZIP integrity / DOCX TOC field valid. `--pdf` and `--require-pdf` CLI flags kept as deprecated no-ops for caller backward-compat.
+- **feat(skill)**: SKILL.md frontmatter description + v1.4.0 change banner; §2.0 5-step table updated; §2.2 mapping updated; §3.1 / §3.2 / §3.3 call protocol updated; §5 `visual-review` row annotated; §6 Strategist "does NOT" annotated; §8 vs ppt-master table updated; §9 checklist 7→5 with deprecation note; §10 `ExportCheckFailed: page count=0` marked legacy; §11 version table + footer bumped to v1.4.0.
+- **docs(report-master)**: README.md + README_zh.md bilingual sync per AGENTS.md #9 — Usage 3-mode + Tier A/C prompts, Quick Start, Pipeline Stage 3, Architecture Mermaid, Progress table, Changelog v1.4.0 row, version footer, test badge (429/431).
+- **out of scope**: SPEC.md (unchanged — needs wai's explicit decision; suggested edits listed in commit body), `projects/dashboard-final/` historical artifacts, `examples/` PDF examples, `references/`, `workflows/` (D7 sub-agent scope), `build_spec_docx.py` (already DOCX-only), intermediate HTML paths (`exports/_intermediate_*.html`, `report_output/section_*.html`, `report_output/_bundle.html`).
+
+**Migration**: Existing `--format pdf,docx` users should remove the flag (default is `docx`) or use `--format html,docx` if they need a named HTML output. The `html_to_pdf.py` module is still importable for ad-hoc PDF generation.
+
+### v1.3.3 — 2026-06-14 (Section Opener Rule + integration test, D7)
+
+- **feat: Section Opener Rule (D7, wai 強調)** — H2 / H3 後必須至少有 1 段 ≥ 2 句的引導 `<p>`,禁止直接接 `<ul>` / `<ol>` / `<table>` / `<pre>` / `<dl>` / `<blockquote>` 等區塊元素。LLM 生成常見毛病是「列點優先勝過敘事節奏」,Section opener 是敘事流暢度的最小可行保證。
+  - **docs**: `references/executor-base.md` §3.3.5 新增 Section Opener Rule 段落(含 before / after 範例、判定細節、與 quality_checker 的協作說明、修補工具指引)。
+  - **feat**: `scripts/quality_checker.py` 新增 `check_section_opener(html)` 函式 — WARN 級(不 BLOCKING),可獨立呼叫;違規寫入 `lock.metadata.warnings`(與 `metadata.progress` 同性質的非 schema 欄位)。提供 `write_warnings_to_lock()` 工具給 Stage 2 / Stage 2.5 / export_checker 共用。
+  - **feat**: `scripts/revise_helper.py` 新增 `--ensure-opener` CLI flag + `ensure_section_openers()` / `build_opener_paragraph()` 內部 API,對缺 opener 的小節自動補上引導段(placeholder 預設,LLM 路徑留待擴充)。預設 off。
+  - **test**: `tests/test_quality_checker_section_opener.py` 新整合測試,涵蓋 13 個 case(3 必要 + 6 補充 + 3 範例 + 1 邊界):PASS / FAIL-H2-list / FAIL-H3-table / 過短 opener / caption 不算 opener / revise_helper 修補流程 / examples 端到端。
+  - **fix**: `examples/section_1.html` 修補 3 條 opener 違規(1.1 / 1.2 / 1.2.1)— 因為這是 integration test 的目的,範例是給使用者參考的「最佳實踐模板」,不應帶違規。
+- **chore(D1)**: `scripts/quality_checker.py` `_FORBIDDEN_CSS_PROPS` 加 canonical-source TODO 註解 — `position: absolute / fixed / sticky` 規則是禁用清單唯一來源;後處理階段(任何 `_merge_html_docs` 變體)若有 regex 剝除這些 CSS 的 workaround,是「過渡解」,應在 quality_checker 階段 BLOCKING,不在後處理階段掩飾。規則已存在(v1.3.2 起),此處只是補上文件化的 single-source-of-truth 聲明。
+- **docs(D3)**: `SKILL.md §3.4` 新增 DOCX 引擎路由說明 — 依 `lock.output.docx_engine` 選擇 `html_to_docx`(pandoc) vs `html_to_docx_direct`(python-docx)。標註目前 `report_gen.py` 未做自動 routing(待下一輪實作 `--docx-engine` flag)。
+- **feat(D5)**: `scripts/export_checker.py` 加 `_check_office_lock_files()` — 掃描 exports/ 目錄裡 `~$` 開頭的 Office 暫存檔(代表上次 Office session 未正常關閉),WARN 級輸出。`ExportCheckReport` 加 `warnings: List[str]` 欄位(向後相容)。
+- **Bilingual README sync** — Progress 表格、Changelog、version footer 全部同步至 v1.3.3(`README.md` + `README_zh.md` 平行),遵守 AGENTS.md #9 hard rule。
+
 ### v1.3.2 — 2026-06-14 (Recommended Prompts section)
 
 - **docs: new `## Recommended Prompts` section — 4-tier prompt catalog for LLM-driven use of the pipeline.**
@@ -689,7 +730,14 @@ Below are the in-project documents (in recommended reading order) and external r
 ---
 
 <p align="center">
-  <sub>Report-master v1.3.2 — Recommended Prompts section (4-tier prompt catalog) · 40/40 (100%) · 2026-06-14</sub><br>
+  <sub>Report-master v1.3.3 — Section Opener Rule + integration test (D7) · 40/40 + 6/6 TR-2 (100%) · 2026-06-14</sub><br>
   <sub>Built with 🐍 Python · 🧱 HTML intermediate · 📄 weasyprint · 📝 pandoc</sub>
   <sub>This is the English primary README · For the Chinese version, see <a href="README_zh.md">README_zh.md</a></sub>
 </p>
+### v1.4.0 (2026-06-14) — DOCX-only Output
+
+- ✅ **scope**: User-facing output is now **DOCX only**; HTML is the pipeline intermediate and remains user-accessible via `--format html,docx`.
+- ✅ `scripts/html_to_pdf.py` is preserved as a **legacy opt-in** module (not invoked by `report_gen`).
+- ✅ `scripts/export_checker.py` 7-item → 5-item (PDF open / font embed / page count checks removed; DOCX 5 checks kept).
+- ✅ `scripts/report_gen.py` `--format` flag accepts `docx` (default) and `html`; legacy `pdf` is silently dropped.
+- ✅ Bilingual `SKILL.md` / `README.md` / `README_zh.md` synced per AGENTS.md #9.
