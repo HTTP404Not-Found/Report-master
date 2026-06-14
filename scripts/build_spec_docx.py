@@ -14,7 +14,7 @@ import sys
 from html import escape
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.source_to_md.md_normalizer import normalize_file  # noqa: E402
@@ -302,6 +302,38 @@ def wrap_html(title: str, body: str) -> str:
 """
 
 
+def _add_page_numbers(docx_path: Path) -> None:
+    """Issue #3 — inject a PAGE field into every section's footer.
+
+    Writes a Word field expression (``PAGE``) via OOXML so soffice / Word
+    render the live page number at print time rather than a fixed digit.
+    Existing footer content is cleared first so reruns don't stack fields.
+    """
+    from docx import Document
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    doc = Document(str(docx_path))
+    for section in doc.sections:
+        footer = section.footer
+        # Use the first paragraph; clear any existing runs to keep reruns idempotent.
+        para = footer.paragraphs[0]
+        for r in list(para.runs):
+            r._element.getparent().remove(r._element)
+        run = para.add_run()
+        fldChar1 = OxmlElement("w:fldChar")
+        fldChar1.set(qn("w:fldCharType"), "begin")
+        instrText = OxmlElement("w:instrText")
+        instrText.set(qn("xml:space"), "preserve")
+        instrText.text = "PAGE"
+        fldChar2 = OxmlElement("w:fldChar")
+        fldChar2.set(qn("w:fldCharType"), "end")
+        run._r.append(fldChar1)
+        run._r.append(instrText)
+        run._r.append(fldChar2)
+    doc.save(str(docx_path))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="把 SPEC.md 轉成 docx")
     ap.add_argument(
@@ -309,6 +341,22 @@ def main() -> int:
         type=Path,
         default=LOCK_FILE,
         help="Path to report_lock.md (default: examples/lock.md)",
+    )
+    ap.add_argument(
+        "--page-numbers",
+        action="store_true",
+        help="Issue #3 — 在每個 section 的 footer 加 PAGE field (default: off)",
+    )
+    ap.add_argument(
+        "--toc",
+        action="store_true",
+        help="Issue #3 — 用 scripts.toc_generator 產生 TOC 並插入 body 開頭 (default: off, 需要 pandoc)",
+    )
+    ap.add_argument(
+        "--toc-depth",
+        type=int,
+        default=3,
+        help="TOC 深度 (1-6, default 3, 配合 --toc 使用)",
     )
     args = ap.parse_args()
     lock_file = args.lock_file
@@ -326,6 +374,21 @@ def main() -> int:
     intermediate.write_text(full_html, encoding="utf-8")
     print(f"[ok] 中間 HTML: {intermediate} ({len(full_html)} chars)")
 
+    # Issue #3 — optional TOC injection (must happen BEFORE html_to_docx_direct,
+    # since the DOCX engine bakes the HTML structure into the final document).
+    if args.toc:
+        try:
+            from scripts.toc_generator import generate_toc  # noqa: WPS433
+            full_html = generate_toc(
+                html_source=intermediate,
+                output_html=intermediate,
+                toc_depth=args.toc_depth,
+            )
+            print(f"[ok] TOC 已注入 {intermediate} (depth={args.toc_depth})")
+        except Exception as e:
+            # Pandoc missing or other generator error — fail soft, continue build.
+            print(f"[toc] skip: {e}")
+
     out_docx = EXPORT_DIR / "SPEC.docx"
     html_to_docx_direct(
         html_source=intermediate,
@@ -333,6 +396,14 @@ def main() -> int:
         lock_file=lock_file,
     )
     print(f"[ok] DOCX: {out_docx} ({out_docx.stat().st_size} bytes)")
+
+    # Issue #3 — optional page-number footer (post-process the saved DOCX).
+    if args.page_numbers:
+        try:
+            _add_page_numbers(out_docx)
+            print(f"[ok] page numbers 已寫入每個 section footer")
+        except Exception as e:
+            print(f"[page-numbers] skip: {e}")
 
     # ── Phase C: post-export validation ──
     try:

@@ -483,6 +483,7 @@ These rules exist because we have hit the issues before — violating any of the
 | **v1.1** | ✅ T3-1 / T3-2 / T3-3 / T3-4 / T3-6 / T3-7 workflows (Strategist + Executor + topic-research + create-template + generate-citations + live-preview) |
 | **v1.2** | ✅ Stage 1.5 Outliner + User confirmation gate + topic-research v1.1 + DOCX bold fix (4 core fixes) |
 | **v1.3** | ✅ 5-step phase flow + feedback routing (Plan / Expand / Structure / Confirm / Format) — see [Pipeline — 5-Step Phase Flow](#pipeline--5-step-phase-flow) |
+| **v1.3.1** | ✅ Issue #2 + #3 fix — table column widths + page-numbers / TOC CLI flags — see [Changelog](#changelog) |
 | **v2.0** | Stage 4 pipeline-as-service + multi-locale |
 
 ---
@@ -497,6 +498,25 @@ Four fundamental workflow issues have been resolved:
 - ✅ **User Confirmation Gate**: New `user-confirmation.md` workflow — pipeline pauses for user OK before Executor runs
 - ✅ **Web Research Integration**: `topic-research.md` updated with `research_content` stage — `web_search` fills in factual gaps per chapter
 - ✅ **DOCX Bold Formatting**: `html_to_docx_direct.py` sanitizes `**text**` → `<strong>` → `bold=True` in Word output
+
+---
+
+## Changelog
+
+### v1.3.1 — 2026-06-14 (Issue #2 / #3 fix)
+
+- **fix: tables — `_add_table` now assigns explicit column widths based on cell content length (CJK 1.0 / ASCII 0.55), preventing soffice PDF column overflow (Issue #2)**
+- **feat: `build_spec_docx.py` — add `--page-numbers` and `--toc` flags (Issue #3)**
+- fix: `build_spec_docx.py` `PROJECT_ROOT` now resolves to project root (was `scripts/`); the script's three path constants (`SPEC_MD`, `LOCK_FILE`, `EXPORT_DIR`) actually pointed one level too deep and the script could never run end-to-end.
+
+### v1.3 — 2026-06-14 (5-step phase flow + feedback routing)
+
+- See [Pipeline — 5-Step Phase Flow](#pipeline--5-step-phase-flow) — Plan / Expand / Structure / Confirm / Format stages with bilingual feedback routing.
+- Bilingual README sync (`README.md` + `README_zh.md`) per AGENTS.md #9 hard rule.
+
+### v1.2 — 2026-06-13 (4 core fixes)
+
+- Stage 1.5 Outliner + User confirmation gate + topic-research v1.1 + DOCX bold fix. See "Core Fixes Applied" above for details.
 
 ## License
 
@@ -555,7 +575,7 @@ Below are the in-project documents (in recommended reading order) and external r
 ---
 
 <p align="center">
-  <sub>Report-master v1.3 · 40/40 (100%) · 2026-06-14</sub><br>
+  <sub>Report-master v1.3.1 — Issue #2 / #3 fix (page numbers + table column widths) · 40/40 (100%) · 2026-06-14</sub><br>
   <sub>Built with 🐍 Python · 🧱 HTML intermediate · 📄 weasyprint · 📝 pandoc</sub>
   <sub>This is the English primary README · For the Chinese version, see <a href="README_zh.md">README_zh.md</a></sub>
 </p>

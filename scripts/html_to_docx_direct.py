@@ -602,6 +602,82 @@ def _add_list(doc, node, ordered: bool, lock: Dict[str, Any]) -> None:
             pass
 
 
+def _compute_table_col_widths(rows_cells, cols: int) -> List[float]:
+    """Estimate per-column widths (in inches) based on cell text length.
+
+    Issue #2 fix — without explicit widths, ``table.autofit = True`` lets
+    soffice (LibreOffice) compress wide columns during PDF export, causing
+    Table 0 R5 (and similar long-cell rows) to overflow. We compute a
+    weighted length per column using a simple heuristic:
+
+      * CJK code points (U+3000–U+9FFF, Hangul U+AC00–U+D7AF,
+        Fullwidth Forms U+FF00–U+FFEF) → weight 1.0 (roughly square)
+      * Everything else → weight 0.55 (narrower ASCII/Latin)
+
+    Each column is floored at MIN_COL_WIDTH so very short headers (e.g.
+    "OK") still render readably. Total width is fixed at 6.5" — A4 page
+    minus the 1" margin on each side. If floor inflation pushes the sum
+    past 6.5" we accept a slight overflow rather than truncate cells.
+
+    Args:
+        rows_cells: list[list[bs4.Tag]] — parsed <tr>/<th>/<td> in
+            document order (one inner list per row).
+        cols: total column count (max row width).
+
+    Returns:
+        list[float] of per-column widths in inches (length == cols).
+    """
+    TOTAL_WIDTH = 6.5
+    MIN_COL_WIDTH = 0.5
+    CJK_WEIGHT = 1.0
+    ASCII_WEIGHT = 0.55
+
+    col_weights: List[float] = [0.0] * cols
+    for cells in rows_cells:
+        for c_idx, cell_html in enumerate(cells):
+            if c_idx >= cols:
+                break
+            text = cell_html.get_text(separator="", strip=True)
+            weight = 0.0
+            for ch in text:
+                cp = ord(ch)
+                if (0x3000 <= cp <= 0x9FFF
+                        or 0xAC00 <= cp <= 0xD7AF
+                        or 0xFF00 <= cp <= 0xFFEF):
+                    weight += CJK_WEIGHT
+                else:
+                    weight += ASCII_WEIGHT
+            if weight > col_weights[c_idx]:
+                col_weights[c_idx] = weight
+
+    total_weight = sum(col_weights)
+    if total_weight <= 0:
+        # Empty table — fall back to equal widths.
+        return [TOTAL_WIDTH / cols] * cols
+
+    widths: List[float] = [
+        max(MIN_COL_WIDTH, TOTAL_WIDTH * w / total_weight)
+        for w in col_weights
+    ]
+    # Floor may inflate the sum past TOTAL_WIDTH. Shrink cols with slack
+    # (width > MIN_COL_WIDTH) proportionally to bring the sum back to
+    # TOTAL_WIDTH. If every col is already at the floor, accept overflow.
+    overflow = sum(widths) - TOTAL_WIDTH
+    if overflow > 1e-6:
+        slack_cols = [i for i, w in enumerate(widths) if w > MIN_COL_WIDTH + 1e-6]
+        if slack_cols:
+            slack_total = sum(widths[i] - MIN_COL_WIDTH for i in slack_cols)
+            if slack_total > 0:
+                scale = overflow / slack_total  # fraction of slack to remove
+                for i in slack_cols:
+                    widths[i] -= (widths[i] - MIN_COL_WIDTH) * scale
+                # Numerical drift — snap to TOTAL_WIDTH exactly.
+                residual = sum(widths) - TOTAL_WIDTH
+                if abs(residual) > 1e-6 and slack_cols:
+                    widths[slack_cols[0]] -= residual
+    return widths
+
+
 def _add_table(doc, node, lock: Dict[str, Any]) -> None:
     """Convert a <table> to a docx table.
 
@@ -609,6 +685,11 @@ def _add_table(doc, node, lock: Dict[str, Any]) -> None:
     Nested tables: outer <table> cells containing inner <table> get rendered
     with a placeholder line + ignored (python-docx cannot represent nested
     tables cleanly, so we log and skip).
+
+    Issue #2 — explicit column widths are now assigned per-column based on
+    cell text length (CJK=1.0, ASCII=0.55) so soffice PDF export no longer
+    compresses wide columns. ``table.autofit`` is set to False so the
+    explicit widths survive the round-trip through LibreOffice.
     """
     rows = []
     # Collect <tr> from thead/tbody/tfoot in order, or directly from table
@@ -633,7 +714,6 @@ def _add_table(doc, node, lock: Dict[str, Any]) -> None:
 
     table = doc.add_table(rows=len(rows), cols=cols)
     table.style = "Table Grid"
-    table.autofit = True
 
     # Read lock table formatting
     table_fmt = (lock.get("formatting") or {}).get("table") or {}
@@ -657,6 +737,25 @@ def _add_table(doc, node, lock: Dict[str, Any]) -> None:
             # If cell contains a nested <table>, log and continue
             if cell_html.find("table") != -1:
                 logger.info("nested <table> detected; docx can't represent it cleanly")
+
+    # Issue #2: assign explicit per-column widths and disable autofit so
+    # soffice PDF export does not re-balance / compress wide columns.
+    try:
+        from docx.shared import Inches
+        col_widths = _compute_table_col_widths(rows, cols)
+        for c_idx, w_inches in enumerate(col_widths):
+            if c_idx < cols:
+                try:
+                    table.rows[0].cells[c_idx].width = Inches(w_inches)
+                except Exception:
+                    # Merged or otherwise non-writable cell — skip.
+                    pass
+        table.autofit = False
+    except Exception as e:
+        # If width assignment fails for any reason, leave autofit on so the
+        # docx still renders — we just lose the no-overflow guarantee.
+        logger.info(f"_add_table: could not assign explicit col widths: {e}")
+        table.autofit = True
 
 
 def _add_image(doc, node, lock: Dict[str, Any]) -> None:

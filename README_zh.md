@@ -482,9 +482,27 @@ python -m scripts.report_gen \
 | **v1.1** | ✅ T3-1 / T3-2 / T3-3 / T3-4 / T3-6 / T3-7 workflows(Strategist + Executor + topic-research + create-template + generate-citations + live-preview) |
 | **v1.2** | ✅ Stage 1.5 Outliner + User confirmation gate + topic-research v1.1 + DOCX bold 修復(4 大核心問題修復) |
 | **v1.3** | ✅ 5 步驟 phase flow + feedback routing(規劃 / 擴充 / 編排 / 確認 / 格式化)— 見 [三階段流程](#三階段流程--pipeline-stages) |
+| **v1.3.1** | ✅ Issue #2 + #3 修復 — table 列寬 + page-numbers / TOC CLI flags — 見 [更新日誌](#更新日誌--changelog) |
 | **v2.0** | Stage 4 pipeline-as-service + multi-locale |
 
 ---
+
+## 更新日誌 / Changelog
+
+### v1.3.1 — 2026-06-14(Issue #2 / #3 修復)
+
+- **fix: tables — `_add_table` 現在會依 cell 內容長度顯式分配列寬(CJK 1.0 / ASCII 0.55),避免 soffice PDF 轉檔時列被壓縮溢出(Issue #2)**
+- **feat: `build_spec_docx.py` — 新增 `--page-numbers` 與 `--toc` CLI 旗標(Issue #3)**
+- fix: `build_spec_docx.py` `PROJECT_ROOT` 改為指向專案根目錄(原本指向 `scripts/`);原本三個路徑常數(`SPEC_MD` / `LOCK_FILE` / `EXPORT_DIR`)都多了一層,讓腳本根本無法跑完整端到端流程。
+
+### v1.3 — 2026-06-14(5 步驟 phase flow + feedback routing)
+
+- 見 [三階段流程](#三階段流程--pipeline-stages) — 規劃 / 擴充 / 編排 / 確認 / 格式化五階段,搭配中英雙語 feedback routing。
+- 雙語 README 同步(`README.md` + `README_zh.md`),遵守 AGENTS.md #9 硬規則。
+
+### v1.2 — 2026-06-13(4 大核心修復)
+
+- Stage 1.5 Outliner + User confirmation gate + topic-research v1.1 + DOCX bold 修復。詳見上述「Core Fixes Applied」一節。
 
 ## 授權 / License
 
@@ -543,7 +561,7 @@ SOFTWARE.
 ---
 
 <p align="center">
-  <sub>Report-master v1.3 · 40/40 (100%) · 2026-06-14</sub><br>
+  <sub>Report-master v1.3.1 — Issue #2 / #3 修復(頁碼 + 表格列寬)· 40/40 (100%) · 2026-06-14</sub><br>
   <sub>Built with 🐍 Python · 🧱 HTML intermediate · 📄 weasyprint · 📝 pandoc</sub>
   <sub>本 README 為中文版 · 英文版請見 <a href="README.md">README.md</a></sub>
 </p>
